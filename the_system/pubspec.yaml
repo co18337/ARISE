@@ -34,6 +34,12 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  drift: ^2.34.3
+  drift_flutter: ^0.3.1
+  # Already in the tree via drift_flutter; named here because the JSON backup
+  # imports it directly, and depending on a transitive package by accident is
+  # how a build breaks on someone else's machine.
+  path_provider: ^2.1.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -44,6 +50,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  drift_dev: ^2.34.5
+  build_runner: ^2.16.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -62,9 +70,15 @@ flutter:
   # to them by family name in TextStyle, and Flutter picks the file matching
   # the requested fontWeight.
   #
-  # Orbitron = angular techno headings · Rajdhani = HUD labels/readouts
-  # Inter    = body text
+  # Orbitron       = angular techno headings
+  # Rajdhani       = HUD labels/readouts
+  # Inter          = body text
+  # ShareTechMono  = counters and numeric readouts (amber), see DESIGN.md
   fonts:
+    - family: ShareTechMono
+      fonts:
+        - asset: assets/fonts/ShareTechMono-Regular.ttf
+          weight: 400
     - family: Orbitron
       fonts:
         - asset: assets/fonts/Orbitron-Regular.ttf

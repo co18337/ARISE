@@ -16,6 +16,9 @@ class AppFonts {
 
   /// Plain, highly legible sans. Actual body text.
   static const String body = 'Inter';
+
+  /// Fixed-width face for counters and numeric readouts.
+  static const String mono = 'ShareTechMono';
 }
 
 /// All text styles in one place.
@@ -89,6 +92,19 @@ class AppTextStyles {
     fontSize: 13,
     fontWeight: FontWeight.w700,
     color: AppColors.primary,
+    letterSpacing: 1.0,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  /// Counters and numeric readouts — countdown timers, XP totals, quest counts.
+  ///
+  /// Amber by default because in this palette gold means "earned / reward /
+  /// time remaining", and counters are almost always one of those.
+  static const TextStyle counter = TextStyle(
+    fontFamily: AppFonts.mono,
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+    color: AppColors.accentGold,
     letterSpacing: 1.0,
     fontFeatures: [FontFeature.tabularFigures()],
   );

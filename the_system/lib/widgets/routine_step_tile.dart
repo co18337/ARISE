@@ -1,0 +1,342 @@
+import 'package:flutter/material.dart';
+
+import '../game/game.dart';
+import '../models/models.dart';
+import '../theme/theme.dart';
+import 'countdown_timer.dart';
+import 'stat_chip.dart';
+
+/// One line of the day's routine, in whichever state the engine gave it.
+///
+/// Resolved and locked steps are deliberately QUIET — a single line each, dim,
+/// no action. Only the active step gets a card ([ActiveStepCard]), because the
+/// entire point of the guided routine is that at any moment there is exactly
+/// one thing being asked of you.
+class RoutineStepTile extends StatelessWidget {
+  final RoutineStep step;
+
+  /// Reopens a resolved step. Null on past days, where the answer is history.
+  final VoidCallback? onReopen;
+
+  const RoutineStepTile({super.key, required this.step, this.onReopen});
+
+  @override
+  Widget build(BuildContext context) {
+    final task = step.task;
+    final (IconData icon, Color color) = switch (step.state) {
+      RoutineState.done => (Icons.check, AppColors.primary),
+      RoutineState.missed => (Icons.close, AppColors.danger),
+      RoutineState.locked => (Icons.lock_outline, AppColors.textDim),
+      // Never rendered here — the screen swaps in an ActiveStepCard instead.
+      RoutineState.active => (Icons.play_arrow, AppColors.accentMagenta),
+    };
+
+    final bool resolved = step.isResolved;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        // Only a resolved step can be undone; a locked one has nothing to say.
+        onTap: resolved ? onReopen : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 10),
+              SizedBox(
+                // Fixed width so every time in the column lines up, which is
+                // what makes the list read as a schedule rather than a list.
+                width: 66,
+                child: Text(
+                  task.scheduledLabel,
+                  style: AppTextStyles.hudLabel.copyWith(
+                    fontSize: 10,
+                    color: step.state == RoutineState.missed
+                        ? AppColors.danger.withValues(alpha: 0.7)
+                        : AppColors.textDim,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  task.template.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.questTitle.copyWith(
+                    fontSize: 14,
+                    color: AppColors.textDim,
+                    decoration: step.state == RoutineState.done
+                        ? TextDecoration.lineThrough
+                        : null,
+                    decorationColor: AppColors.textDim,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              StatChip(stat: task.stat, dimmed: true),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 34,
+                child: Text(
+                  step.state == RoutineState.done ? '+${task.xpAwarded}' : '—',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.xpBadge.copyWith(
+                    fontSize: 12,
+                    color: step.state == RoutineState.done
+                        ? AppColors.accentGold
+                        : AppColors.textDim,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The step you're on: the only thing on the screen that can be acted on.
+///
+/// Magenta rather than cyan, because in this palette magenta means "live /
+/// urgent" and this is the one panel that is genuinely both.
+class ActiveStepCard extends StatelessWidget {
+  final DailyTask task;
+  final VoidCallback onDone;
+  final VoidCallback onMissed;
+
+  /// When this step's window shuts, for the countdown. Null hides the timer.
+  final DateTime? closesAt;
+
+  const ActiveStepCard({
+    super.key,
+    required this.task,
+    required this.onDone,
+    required this.onMissed,
+    this.closesAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Breathing(
+      child: Container(
+        decoration: ShapeDecoration(
+          color: AppColors.accentMagenta.withValues(alpha: 0.07),
+          shape: ChamferBorder(
+            cut: 14,
+            side: BorderSide(
+              color: AppColors.accentMagenta.withValues(alpha: 0.75),
+              width: 1.2,
+            ),
+          ),
+          shadows: [
+            BoxShadow(
+              color: AppColors.accentMagenta.withValues(alpha: 0.28),
+              blurRadius: 22,
+              spreadRadius: -4,
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                // Expanded (not Spacer) so a long time label ellipsises
+                // instead of overflowing the card at 360dp phone width.
+                Expanded(
+                  child: Text(
+                    'NOW · ${task.scheduledLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.hudLabel.copyWith(
+                      color: AppColors.accentMagenta,
+                    ),
+                  ),
+                ),
+                if (closesAt != null)
+                  CountdownTimer(
+                    target: closesAt!,
+                    label: 'CLOSES',
+                    style: AppTextStyles.counter.copyWith(fontSize: 12),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              task.template.title,
+              style: AppTextStyles.questTitle.copyWith(
+                fontSize: 19,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(task.template.category.label, style: AppTextStyles.body),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                StatChip(stat: task.stat),
+                const SizedBox(width: 10),
+                Text(
+                  '+${task.xpAwarded} XP',
+                  style: AppTextStyles.xpBadge.copyWith(
+                    color: AppColors.accentGold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                // DONE is the wider, brighter half on purpose: the two
+                // outcomes are equally valid answers, but only one of them is
+                // the one you came here to give.
+                Expanded(
+                  flex: 3,
+                  child: _AnswerButton(
+                    label: 'DONE',
+                    icon: Icons.check,
+                    color: AppColors.accentGold,
+                    filled: true,
+                    onPressed: onDone,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: _AnswerButton(
+                    label: 'MISSED',
+                    icon: Icons.close,
+                    color: AppColors.danger,
+                    filled: false,
+                    onPressed: onMissed,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One of the two answers. Filled = the reward path, outlined = the honest
+/// admission; both are one tap, because making "missed" harder to press would
+/// just teach you to lie to the app.
+class _AnswerButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool filled;
+  final VoidCallback onPressed;
+
+  const _AnswerButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.filled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = ChamferBorder(
+      cut: 8,
+      side: BorderSide(color: color.withValues(alpha: filled ? 1 : 0.6)),
+    );
+
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        color: color.withValues(alpha: filled ? 0.9 : 0.08),
+        shape: shape,
+        shadows: [
+          if (filled)
+            BoxShadow(
+              color: color.withValues(alpha: 0.35),
+              blurRadius: 14,
+              spreadRadius: -3,
+            ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: filled ? AppColors.background : color,
+                ),
+                const SizedBox(width: 6),
+                // Flexible + ellipsis: these two buttons sit side by side in
+                // a fixed-width card, and a wide letter-spaced label is the
+                // classic thing that overflows by a pixel or two on a 360dp
+                // phone. Shrinking beats overflowing.
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.panelTitle.copyWith(
+                      fontSize: 12,
+                      letterSpacing: 1.5,
+                      color: filled ? AppColors.background : color,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A slow glow pulse on the active card.
+///
+/// Two seconds per cycle and only a few percent of opacity — enough that the
+/// eye lands on it first, not so much that it nags. Reversing the controller
+/// forever costs nothing while the widget is on screen and stops automatically
+/// when it isn't.
+class _Breathing extends StatefulWidget {
+  final Widget child;
+
+  const _Breathing({required this.child});
+
+  @override
+  State<_Breathing> createState() => _BreathingState();
+}
+
+class _BreathingState extends State<_Breathing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.88, end: 1.0).animate(_controller),
+      child: widget.child,
+    );
+  }
+}

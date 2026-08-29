@@ -1,22 +1,13 @@
 import '../models/models.dart';
-import 'task_catalog.dart';
 
-/// Builds the list of tasks scheduled for [date], by checking every template
-/// in [catalog] against its [ScheduleType].
+/// Decides which catalog templates are due on a given date.
 ///
-/// [catalog] defaults to the real [TaskCatalog.all] but can be overridden —
-/// mainly so tests can pass in a small fake list instead of the whole plan.
-List<DailyTask> generateTasksForDate(
-  DateTime date, {
-  List<TaskTemplate> catalog = TaskCatalog.all,
-}) {
-  return catalog
-      .where((template) => _isScheduledOn(template, date))
-      .map((template) => DailyTask(template: template, date: date))
-      .toList();
-}
+/// This is deliberately pure — it only answers "is this scheduled?" and never
+/// touches the database. Creating the actual `daily_quests` rows is the
+/// repository's job, so this logic stays trivially unit-testable.
 
-bool _isScheduledOn(TaskTemplate template, DateTime date) {
+/// Whether [template] is scheduled to run on [date].
+bool isScheduledOn(TaskTemplate template, DateTime date) {
   switch (template.schedule) {
     case ScheduleType.daily:
       return true;
@@ -28,3 +19,9 @@ bool _isScheduledOn(TaskTemplate template, DateTime date) {
       return template.daysOfWeek.contains(date.weekday);
   }
 }
+
+/// The subset of [catalog] due on [date], preserving catalog order.
+List<TaskTemplate> templatesScheduledOn(
+  List<TaskTemplate> catalog,
+  DateTime date,
+) => catalog.where((t) => isScheduledOn(t, date)).toList();

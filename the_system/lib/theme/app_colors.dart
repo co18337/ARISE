@@ -24,10 +24,16 @@ class AppColors {
   static const Color primaryBright = Color(0xFF7DF9FF); // hot highlight
   static const Color primaryDim = Color(0xFF0E7490); // inactive borders
 
-  // --- Accents, used sparingly.
-  static const Color accentPurple = Color(0xFFA855F7); // ranks
-  static const Color accentGold = Color(0xFFFFC53D); // level-up, rewards
+  // --- Accents. Each has exactly ONE meaning; see DESIGN.md §1. A colour that
+  // means something cannot also be used decoratively.
+  static const Color accentPurple = Color(0xFFA855F7); // energy & progress
+  static const Color accentGold = Color(0xFFFFC53D); // reward, claim, earned
+  static const Color accentMagenta = Color(0xFFF0389D); // live / urgent
   static const Color danger = Color(0xFFFF4D6D); // penalties, missed quests
+
+  /// The unfilled part of a tiered bar — what there still is to earn. Paired
+  /// with [accentGold] for what already has been.
+  static const Color remaining = Color(0xFF4ADE80);
 
   // --- Text. Cool-tinted whites; never pure #FFFFFF (too harsh on OLED).
   static const Color textPrimary = Color(0xFFE6F1FF);

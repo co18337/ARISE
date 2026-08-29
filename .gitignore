@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------------
+# Planning documents stay on this machine.
+#
+# CLAUDE.md, ARCHITECTURE.md, ROADMAP.md and DESIGN.md are the working plan —
+# body data, timings, phase-by-phase intentions. They live next to the code,
+# not on GitHub.
+#
+# README.md is the one exception: a repo with no readme is unreadable to
+# anyone, including me in a year.
+#
+# NOTE: this only affects UNTRACKED files. Docs that were already committed
+# have to be untracked once with `git rm --cached <file>` before this takes
+# effect on them.
+# ---------------------------------------------------------------------------
+*.md
+!README.md
+
+# Health records — blood work, body composition scans, prescriptions. These
+# are the reason the app exists, and they must never be pushed anywhere.
+*.pdf
+/health/

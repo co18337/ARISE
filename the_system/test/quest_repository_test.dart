@@ -314,6 +314,30 @@ void main() {
       expect(log.single.xpDelta, isNull);
     });
 
+    test('a perfect day unlocks the first FLAWLESS medal, once', () async {
+      await repo.materialiseDay(wednesday);
+      for (final quest in await repo.watchDay(wednesday).first) {
+        await repo.setStatus(quest, QuestStatus.done);
+      }
+
+      final log = await db.select(db.activityLogEntries).get();
+      final medals =
+          log.where((e) => e.kind == ActivityKind.achievementUnlocked).toList();
+
+      // FLAWLESS bronze is one perfect day. DILIGENCE and the rest need far
+      // more, so exactly one medal should have landed.
+      expect(medals, hasLength(1));
+      expect(medals.single.title, 'FLAWLESS · BRONZE');
+
+      // A recompute re-derives the same totals, so it must announce nothing.
+      await repo.recomputeAll();
+      final after = await db.select(db.activityLogEntries).get();
+      expect(
+        after.where((e) => e.kind == ActivityKind.achievementUnlocked),
+        hasLength(1),
+      );
+    });
+
     test('reopening a completed step gives back the XP it awarded', () async {
       await repo.materialiseDay(wednesday);
       final quests = await repo.watchDay(wednesday).first;

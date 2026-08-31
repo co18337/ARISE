@@ -4,7 +4,10 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:the_system/data/day_key.dart';
 import 'package:the_system/data/db/database.dart';
+import 'package:the_system/data/repositories/player_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
+import 'package:the_system/data/repositories/workout_repository.dart';
+import 'package:the_system/game/game.dart';
 import 'package:the_system/models/models.dart';
 
 /// Proves the upgrade paths work on a database that already holds data.
@@ -111,6 +114,100 @@ void main() {
     await upgraded.close();
   });
 
+  test('upgrading a v3 database gains the lifetime quest counter', () async {
+    final day = DateTime(2026, 8, 26);
+
+    final old = AppDatabase(NativeDatabase(dbFile));
+    final repo = QuestRepository(old);
+    await repo.materialiseDay(day);
+    for (final quest in await repo.watchDay(day).first) {
+      await repo.setStatus(quest, QuestStatus.done);
+    }
+    final clearedBefore = (await (old.select(old.playerStates)
+              ..where((p) => p.id.equals(0)))
+            .getSingle())
+        .questsCleared;
+    expect(clearedBefore, greaterThan(0));
+
+    await _rewindToV3(old);
+    await old.close();
+
+    final upgraded = AppDatabase(NativeDatabase(dbFile));
+    var player = await (upgraded.select(upgraded.playerStates)
+          ..where((p) => p.id.equals(0)))
+        .getSingle();
+    // The column arrives at its default; nothing is lost, because the value is
+    // a cache that recomputeAll rebuilds from daily_quests.
+    expect(player.questsCleared, 0);
+
+    await QuestRepository(upgraded).recomputeAll();
+    player = await (upgraded.select(upgraded.playerStates)
+          ..where((p) => p.id.equals(0)))
+        .getSingle();
+    expect(player.questsCleared, clearedBefore);
+
+    await upgraded.close();
+  });
+
+  test('upgrading a v5 database gains the training tables', () async {
+    final old = AppDatabase(NativeDatabase(dbFile));
+    await old.customStatement('SELECT 1'); // force onCreate
+    await old.customStatement(
+      'UPDATE player_states SET hunter_name = ? WHERE id = 0',
+      ['OLD_SAVE'],
+    );
+    await _rewindToV5(old);
+    await old.close();
+
+    // Reopening runs onUpgrade(from: 5, to: 6).
+    final upgraded = AppDatabase(NativeDatabase(dbFile));
+    final repo = WorkoutRepository(
+      upgraded,
+      clock: FixedClock(DateTime(2026, 8, 31, 7)), // a Monday
+    );
+
+    // The new tables exist and a session can actually be built in them.
+    final session = await repo.openSession(DateTime(2026, 8, 31));
+    expect(session, isNotNull);
+    expect(session!.exercises, isNotEmpty);
+
+    // Week 1 of the programme, because the start day is recorded on first use
+    // rather than inferred from data that predates training.
+    expect(session.week, 1);
+    expect(session.phase, TrainingPhase.ignite);
+
+    final player = await (upgraded.select(upgraded.playerStates)
+          ..where((p) => p.id.equals(0)))
+        .getSingle();
+    expect(player.hunterName, 'OLD_SAVE');
+    expect(player.programmeStartDay, isNotNull);
+
+    await upgraded.close();
+  });
+
+  test('upgrading a v7 database gains the reward bookkeeping', () async {
+    final old = AppDatabase(NativeDatabase(dbFile));
+    await old.customStatement('SELECT 1');
+    await old.customStatement(
+      'UPDATE player_states SET total_xp = 5000, acknowledged_level = 3 '
+      'WHERE id = 0',
+    );
+    await _rewindToV7(old);
+    await old.close();
+
+    final upgraded = AppDatabase(NativeDatabase(dbFile));
+    final player = await PlayerRepository(upgraded).read();
+
+    // Nothing lost, and the new column starts empty — so medals already
+    // earned are announced once on the next launch rather than never.
+    expect(player.totalXp, 5000);
+    expect(player.acknowledgedLevel, 3);
+    expect(player.acknowledgedMedals, isEmpty);
+    expect(player.pending, isNotEmpty);
+
+    await upgraded.close();
+  });
+
   test('a database created fresh is already at the current schema', () async {
     final db = AppDatabase(NativeDatabase(dbFile));
     final version = await db.customSelect('PRAGMA user_version').getSingle();
@@ -127,9 +224,54 @@ void main() {
   });
 }
 
+/// Rewinds a freshly created database so it looks like schema v7.
+Future<void> _rewindToV7(AppDatabase db) async {
+  await db.customStatement(
+    'ALTER TABLE player_states DROP COLUMN acknowledged_medals',
+  );
+  await db.customStatement('PRAGMA user_version = 7');
+}
+
+/// Rewinds a freshly created database so it looks like schema v6.
+Future<void> _rewindToV6(AppDatabase db) async {
+  await _rewindToV7(db);
+  await db.customStatement('DROP TABLE IF EXISTS memory_chunks');
+  await db.customStatement('DROP TABLE IF EXISTS memory_documents');
+  await db.customStatement('PRAGMA user_version = 6');
+}
+
+/// Rewinds a freshly created database so it looks like schema v5.
+Future<void> _rewindToV5(AppDatabase db) async {
+  await _rewindToV6(db);
+  await db.customStatement('ALTER TABLE workout_sessions DROP COLUMN notes');
+  await db.customStatement('DROP TABLE IF EXISTS workout_sets');
+  await db.customStatement('DROP TABLE IF EXISTS workout_sessions');
+  await db.customStatement(
+    'ALTER TABLE player_states DROP COLUMN programme_start_day',
+  );
+  await db.customStatement('PRAGMA user_version = 5');
+}
+
+/// Rewinds a freshly created database so it looks like schema v4.
+Future<void> _rewindToV4(AppDatabase db) async {
+  await _rewindToV5(db);
+  await db.customStatement('ALTER TABLE player_states DROP COLUMN theme_mode');
+  await db.customStatement('PRAGMA user_version = 4');
+}
+
+/// Rewinds a freshly created database so it looks like schema v3.
+Future<void> _rewindToV3(AppDatabase db) async {
+  await _rewindToV4(db);
+  await db.customStatement(
+    'ALTER TABLE player_states DROP COLUMN quests_cleared',
+  );
+  await db.customStatement('PRAGMA user_version = 3');
+}
+
 /// Rewinds a freshly created database so it looks like schema v2: the routine
 /// columns removed and the old `done` boolean put back.
 Future<void> _rewindToV2(AppDatabase db) async {
+  await _rewindToV3(db);
   await db.customStatement(
     'ALTER TABLE daily_quests ADD COLUMN done INTEGER NOT NULL DEFAULT 0',
   );

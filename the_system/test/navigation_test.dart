@@ -5,11 +5,16 @@ import 'package:the_system/data/db/database.dart';
 import 'package:the_system/data/export/export_repository.dart';
 import 'package:the_system/data/repositories/activity_repository.dart';
 import 'package:the_system/data/repositories/player_repository.dart';
+import 'package:the_system/data/memory/memory_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
+import 'package:the_system/data/repositories/workout_repository.dart';
 import 'package:the_system/game/game.dart';
 import 'package:the_system/main.dart';
 import 'package:the_system/screens/activity_log_screen.dart';
 import 'package:the_system/screens/backup_screen.dart';
+import 'package:the_system/screens/badge_gallery_screen.dart';
+import 'package:the_system/screens/memory_screen.dart';
+import 'package:the_system/screens/training_screen.dart';
 import 'package:the_system/screens/nav_hub.dart';
 import 'package:the_system/screens/status_screen.dart';
 import 'package:the_system/screens/today_screen.dart';
@@ -35,6 +40,8 @@ void main() {
     playerRepository: PlayerRepository(db),
     activityRepository: ActivityRepository(db),
     exportRepository: ExportRepository(db),
+      workoutRepository: WorkoutRepository(db, clock: clock),
+      memoryRepository: MemoryRepository(db),
   );
 
   /// Explicit pumps rather than pumpAndSettle — see the note in widget_test.
@@ -82,8 +89,11 @@ void main() {
       'DAILY QUESTS',
       'STATUS',
       'REPORT',
+      'TRAINING',
       'LOG',
+      'MEMORY',
       'BACKUP',
+      'BADGES',
     ]) {
       expect(
         find.descendant(of: hub, matching: find.text(label)),
@@ -246,6 +256,211 @@ void main() {
     expect(
       inBackup(find.textContaining('"app": "The System"')),
       findsOneWidget,
+    );
+
+    await disposeTree(tester);
+  });
+
+  testWidgets('TRAINING issues the session behind the workout step', (
+    WidgetTester tester,
+  ) async {
+    useTallSurface(tester);
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await navigateTo(tester, 'TRAINING');
+
+    final training = find.byType(TrainingScreen);
+    Finder inTraining(Finder m) => find.descendant(of: training, matching: m);
+
+    expect(training, findsOneWidget);
+    // Week 1 of the programme, and the phase says what it is for.
+    expect(inTraining(find.text('WEEK 1')), findsOneWidget);
+    expect(
+      inTraining(find.textContaining('IGNITE')),
+      findsOneWidget,
+      reason: 'month one should be the cardio-only phase',
+    );
+    expect(inTraining(find.text('SETS LOGGED')), findsOneWidget);
+    // Nothing logged yet, so the finish button reports what is left.
+    expect(inTraining(find.textContaining('SETS REMAINING')), findsOneWidget);
+    expect(inTraining(find.text('FINISH SESSION')), findsNothing);
+
+    await disposeTree(tester);
+  });
+
+  testWidgets('logging a set moves the training session on', (
+    WidgetTester tester,
+  ) async {
+    useTallSurface(tester);
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await navigateTo(tester, 'TRAINING');
+
+    final before = find.descendant(
+      of: find.byType(TrainingScreen),
+      matching: find.byIcon(Icons.check),
+    );
+    expect(before, findsNothing);
+
+    // Tap the first set chip.
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(TrainingScreen),
+            matching: find.byIcon(Icons.radio_button_unchecked),
+          )
+          .first,
+    );
+    await settle(tester);
+
+    expect(before, findsWidgets);
+
+    await disposeTree(tester);
+  });
+
+  testWidgets('MEMORY seeds a corpus and finds things in it', (
+    WidgetTester tester,
+  ) async {
+    useTallSurface(tester);
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await navigateTo(tester, 'MEMORY');
+
+    final memory = find.byType(MemoryScreen);
+    Finder inMemory(Finder m) => find.descendant(of: memory, matching: m);
+
+    expect(inMemory(find.text('CORPUS')), findsOneWidget);
+    // Nothing stored yet, and the screen is honest about the key.
+    expect(inMemory(find.text('not set')), findsOneWidget);
+
+    await tester.tap(inMemory(find.text('SEED SAMPLE CORPUS')));
+    // Seeding embeds well over a hundred chunks, so it needs longer than the
+    // usual settle.
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(inMemory(find.textContaining('Seeded')), findsOneWidget);
+
+    await tester.tap(inMemory(find.text('SEARCH MEMORY')));
+    await settle(tester);
+    // Real retrieval over the seeded corpus, with scores shown.
+    expect(inMemory(find.textContaining('Found')), findsOneWidget);
+
+    await disposeTree(tester);
+  });
+
+  testWidgets('a finished session is locked and says so', (
+    WidgetTester tester,
+  ) async {
+    useTallSurface(tester);
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await navigateTo(tester, 'TRAINING');
+
+    final training = find.byType(TrainingScreen);
+    Finder inTraining(Finder m) => find.descendant(of: training, matching: m);
+
+    // Log every set.
+    for (var i = 0; i < 20; i++) {
+      final open = inTraining(find.byIcon(Icons.radio_button_unchecked));
+      if (open.evaluate().isEmpty) break;
+      await tester.tap(open.first);
+      await settle(tester);
+    }
+    expect(inTraining(find.byIcon(Icons.radio_button_unchecked)), findsNothing);
+    expect(inTraining(find.text('FINISH SESSION')), findsOneWidget);
+
+    await tester.tap(inTraining(find.text('FINISH SESSION')));
+    await settle(tester);
+
+    // The screen now visibly says the session is closed, rather than looking
+    // exactly as it did a moment earlier.
+    expect(inTraining(find.text('SESSION SIGNED OFF')), findsOneWidget);
+    expect(inTraining(find.text('SESSION COMPLETE')), findsOneWidget);
+
+    // And the sets can no longer be un-ticked behind the session's back.
+    final chips = inTraining(find.byIcon(Icons.check));
+    expect(chips, findsWidgets);
+    await tester.tap(chips.first);
+    await settle(tester);
+    expect(
+      inTraining(find.byIcon(Icons.radio_button_unchecked)),
+      findsNothing,
+      reason: 'a finished session must not be editable',
+    );
+
+    await disposeTree(tester);
+  });
+
+  testWidgets('finishing the session clears the workout quest and awards XP', (
+    WidgetTester tester,
+  ) async {
+    useTallSurface(tester);
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await navigateTo(tester, 'TRAINING');
+
+    for (var i = 0; i < 20; i++) {
+      final open = find.descendant(
+        of: find.byType(TrainingScreen),
+        matching: find.byIcon(Icons.radio_button_unchecked),
+      );
+      if (open.evaluate().isEmpty) break;
+      await tester.tap(open.first);
+      await settle(tester);
+    }
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TrainingScreen),
+        matching: find.text('FINISH SESSION'),
+      ),
+    );
+    await settle(tester);
+
+    // The 20 XP for the workout quest actually lands. This is the call that
+    // used to be a dropped Future.
+    //
+    // Asserted through the UI, not by awaiting a database read here: inside
+    // testWidgets the fake clock never advances for real async, so awaiting a
+    // repository future in the test body hangs forever.
+    await navigateTo(tester, 'DAILY QUESTS');
+    expect(
+      find.descendant(of: find.byType(TodayScreen), matching: find.text('+20')),
+      findsOneWidget,
+      reason: 'the workout quest should be cleared and paid',
+    );
+    // And the shell's running total moved with it.
+    expect(find.text('20'), findsWidgets);
+
+    await disposeTree(tester);
+  });
+
+  testWidgets('the badge gallery lists every usable badge', (
+    WidgetTester tester,
+  ) async {
+    // A dev screen, but a tested one: it drives 33 image assets, and a typo in
+    // a filename shows as a blank square with no error anywhere.
+    useTallSurface(tester);
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await navigateTo(tester, 'BADGES');
+
+    final gallery = find.byType(BadgeGalleryScreen);
+    expect(gallery, findsOneWidget);
+    // Every usable badge renders. A typo in a filename shows as a blank square
+    // with no error anywhere, so this is worth asserting even on a dev screen.
+    expect(
+      find.descendant(of: gallery, matching: find.byType(Image)),
+      findsNWidgets(BadgeGalleryScreen.usable.length),
+    );
+    // The picks are labelled so a screenshot shows what is taken.
+    expect(
+      find.descendant(of: gallery, matching: find.text('S RANK')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: gallery, matching: find.text('SPARE')),
+      findsNWidgets(2),
     );
 
     await disposeTree(tester);

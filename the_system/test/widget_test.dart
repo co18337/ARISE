@@ -5,7 +5,9 @@ import 'package:the_system/data/db/database.dart';
 import 'package:the_system/data/export/export_repository.dart';
 import 'package:the_system/data/repositories/activity_repository.dart';
 import 'package:the_system/data/repositories/player_repository.dart';
+import 'package:the_system/data/memory/memory_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
+import 'package:the_system/data/repositories/workout_repository.dart';
 import 'package:the_system/game/game.dart';
 import 'package:the_system/main.dart';
 import 'package:the_system/screens/today_screen.dart';
@@ -37,6 +39,8 @@ void main() {
     playerRepository: PlayerRepository(db),
     activityRepository: ActivityRepository(db),
     exportRepository: ExportRepository(db),
+      workoutRepository: WorkoutRepository(db, clock: clock),
+      memoryRepository: MemoryRepository(db),
   );
 
   /// Pumps enough frames for the FutureBuilder and StreamBuilders to resolve.
@@ -101,8 +105,11 @@ void main() {
 
     expect(find.text('HUNTER'), findsOneWidget);
     expect(find.text('PRINCE'), findsOneWidget); // seeded player name
-    expect(find.text('LEVEL'), findsOneWidget);
-    expect(find.text('E'), findsOneWidget); // rank chip, fresh player
+    expect(find.text('LEVEL 1'), findsOneWidget);
+    expect(find.text('E RANK'), findsOneWidget); // fresh player
+    // The crest is artwork, so it announces itself through semantics rather
+    // than through any text a finder could match.
+    expect(find.bySemanticsLabel('E rank'), findsOneWidget);
 
     // Shell counter bar.
     expect(find.text('TOTAL XP'), findsOneWidget);
@@ -204,15 +211,16 @@ void main() {
     await tester.pumpWidget(buildApp());
     await settle(tester);
 
-    // Two zeroed readouts: the steps-cleared counter and the DAILY XP bar.
-    // (RankHeader's XP bar renders no text.)
-    expect(find.textContaining(RegExp(r'^0 / ')), findsNWidgets(2));
+    // Two zeroed readouts on the screen itself: the steps-cleared counter and
+    // the DAILY XP bar. Scoped to TodayScreen because the shell's RankHeader
+    // now shows a third one (XP toward the next level).
+    expect(inToday(find.textContaining(RegExp(r'^0 / '))), findsNWidgets(2));
 
     await tester.tap(inToday(find.text('DONE')));
     await settle(tester);
 
     // Drink 3L water is worth 10 XP.
-    expect(find.textContaining(RegExp(r'^10 / ')), findsOneWidget);
+    expect(inToday(find.textContaining(RegExp(r'^10 / '))), findsOneWidget);
 
     await disposeTree(tester);
   });
@@ -228,7 +236,7 @@ void main() {
     await settle(tester);
 
     // A miss is an answer, so the day advances — but the XP bar does not move.
-    expect(find.textContaining(RegExp(r'^0 / ')), findsNWidgets(2));
+    expect(inToday(find.textContaining(RegExp(r'^0 / '))), findsNWidgets(2));
     expect(inToday(find.text('NOW · 8:00 PM')), findsNothing);
 
     await disposeTree(tester);
@@ -250,6 +258,8 @@ void main() {
         playerRepository: PlayerRepository(db),
         activityRepository: ActivityRepository(db),
         exportRepository: ExportRepository(db),
+      workoutRepository: WorkoutRepository(db, clock: clock),
+      memoryRepository: MemoryRepository(db),
       ),
     );
     await settle(tester);

@@ -170,6 +170,39 @@ class QuestRepository {
   Future<void> setDone(DailyTask task, bool done) =>
       setStatus(task, done ? QuestStatus.done : QuestStatus.pending);
 
+  /// Marks the quest for [templateId] on [date] as done, if it was issued.
+  ///
+  /// Exists so finishing a training session can clear the routine's workout
+  /// step: the two are the same commitment recorded in two places, and making
+  /// you tick it twice would be the app not paying attention.
+  Future<void> completeTemplate(String templateId, DateTime date) async {
+    final key = dayKeyOf(date);
+
+    // A one-shot JOIN, not `watchDay(date).first`. Awaiting a watched stream's
+    // first event is not guaranteed to complete promptly — it hung outright
+    // under flutter_test's fake clock — and this call is the one that awards
+    // the XP for finishing a training session. It must not be able to stall.
+    final row = await (db.select(db.dailyQuests).join([
+      innerJoin(
+        db.taskTemplates,
+        db.taskTemplates.id.equalsExp(db.dailyQuests.templateId),
+      ),
+    ])..where(
+          db.dailyQuests.day.equals(key) &
+              db.dailyQuests.templateId.equals(templateId),
+        ))
+        .getSingleOrNull();
+    if (row == null) return;
+
+    await setStatus(
+      _toDailyTask(
+        row.readTable(db.dailyQuests),
+        row.readTable(db.taskTemplates),
+      ),
+      QuestStatus.done,
+    );
+  }
+
   /// Closes out every step of [day] left unanswered past its window.
   ///
   /// This is what makes the day finish itself even if the app is never opened:
@@ -320,10 +353,12 @@ class QuestRepository {
     final today = dayKeyOf(clock.now());
 
     int total = 0, str = 0, sta = 0, dis = 0, rec = 0, perfectDays = 0;
+    int questsCleared = 0;
     final qualifyingDays = <int>{};
 
     for (final r in rollups) {
       total += r.xpEarned;
+      questsCleared += r.questsCleared;
       str += r.strXp;
       sta += r.staXp;
       dis += r.disXp;
@@ -352,11 +387,26 @@ class QuestRepository {
         currentStreak: Value(streaks.current),
         longestStreak: Value(streaks.longest),
         perfectDays: Value(perfectDays),
+        questsCleared: Value(questsCleared),
         lastActiveDay: Value(today),
       ),
     );
 
+    final after = AchievementMetrics(
+      longestStreak: streaks.longest,
+      perfectDays: perfectDays,
+      questsCleared: questsCleared,
+      totalXp: total,
+      statXp: {
+        StatType.str: str,
+        StatType.sta: sta,
+        StatType.dis: dis,
+        StatType.rec: rec,
+      },
+    );
+
     await _logMilestones(before: before, newTotalXp: total, streaks: streaks);
+    await _logAchievements(before: metricsOf(before), after: after);
   }
 
   /// One activity-log entry per answered step.
@@ -426,6 +476,37 @@ class QuestRepository {
         ActivityKind.streakBroken,
         'Streak broken',
         detail: 'A ${before.currentStreak} day streak ended',
+      );
+    }
+  }
+
+  /// Reads the achievement metrics off a stored player row.
+  ///
+  /// Public so tests can assert a medal's standing straight from the database
+  /// without going through the UI.
+  static AchievementMetrics metricsOf(PlayerStateRow row) => AchievementMetrics(
+    longestStreak: row.longestStreak,
+    perfectDays: row.perfectDays,
+    questsCleared: row.questsCleared,
+    totalXp: row.totalXp,
+    statXp: {
+      StatType.str: row.strXp,
+      StatType.sta: row.staXp,
+      StatType.dis: row.disXp,
+      StatType.rec: row.recXp,
+    },
+  );
+
+  /// One log entry per tier newly reached.
+  Future<void> _logAchievements({
+    required AchievementMetrics before,
+    required AchievementMetrics after,
+  }) async {
+    for (final award in newlyEarned(before: before, after: after)) {
+      await _log(
+        ActivityKind.achievementUnlocked,
+        '${award.id.label} · ${award.tier.label}',
+        detail: '${award.id.description} — ${award.id.thresholds[award.tier.index]} ${award.id.unit}',
       );
     }
   }

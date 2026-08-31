@@ -8,14 +8,14 @@ class HudTabBar extends StatelessWidget {
   final List<String> labels;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
-  final Color accent;
+  final Color? accent;
 
   const HudTabBar({
     super.key,
     required this.labels,
     required this.selectedIndex,
     required this.onSelected,
-    this.accent = AppColors.accentGold,
+    this.accent,
   });
 
   @override
@@ -41,7 +41,7 @@ class HudTabBar extends StatelessWidget {
 class _Tab extends StatelessWidget {
   final String label;
   final bool selected;
-  final Color accent;
+  final Color? accent;
 
   const _Tab({required this.label, required this.selected, required this.accent});
 

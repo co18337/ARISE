@@ -13,19 +13,23 @@ class GradientButton extends StatelessWidget {
   final IconData? icon;
 
   /// Gradient endpoints. Defaults to violet→cyan; pass gold for reward moments.
-  final List<Color> colors;
+  /// Nullable because a default parameter value must be a compile-time
+  /// constant, and palette colours are runtime getters now.
+  final List<Color>? colors;
 
   const GradientButton({
     super.key,
     required this.label,
     this.onPressed,
     this.icon,
-    this.colors = const [AppColors.accentPurple, AppColors.primary],
+    this.colors,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool enabled = onPressed != null;
+    final List<Color> colors =
+        this.colors ?? [AppColors.accentPurple, AppColors.primary];
 
     return Opacity(
       // A disabled primary button should still be legible — it's telling you
@@ -34,7 +38,7 @@ class GradientButton extends StatelessWidget {
       child: DecoratedBox(
         decoration: ShapeDecoration(
           gradient: LinearGradient(colors: colors),
-          shape: const ChamferBorder(cut: 10),
+          shape: AppShapes.control(),
           shadows: [
             if (enabled)
               BoxShadow(
@@ -48,7 +52,7 @@ class GradientButton extends StatelessWidget {
         // the chamfered shape rather than a rectangle.
         child: Material(
           color: Colors.transparent,
-          shape: const ChamferBorder(cut: 10),
+          shape: AppShapes.control(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onPressed,

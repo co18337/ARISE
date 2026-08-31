@@ -25,11 +25,16 @@ class AppFonts {
 ///
 /// HUD labels are uppercase with wide letter-spacing; that spacing is what
 /// sells the "machine readout" feel more than the font choice itself.
+///
+/// GETTERS, not constants: each style bakes in a palette colour, and the
+/// palette can change at runtime (see AppColors). A `static const TextStyle`
+/// would capture the dark theme's colours once at class-load and keep them
+/// forever, so switching to the warm theme would leave every label unreadable.
 class AppTextStyles {
   AppTextStyles._();
 
   /// Big screen title, e.g. "DAILY QUESTS".
-  static const TextStyle display = TextStyle(
+  static TextStyle get display => TextStyle(
     fontFamily: AppFonts.display,
     fontSize: 22,
     fontWeight: FontWeight.w900,
@@ -39,7 +44,7 @@ class AppTextStyles {
   );
 
   /// Panel headings, e.g. a category name.
-  static const TextStyle panelTitle = TextStyle(
+  static TextStyle get panelTitle => TextStyle(
     fontFamily: AppFonts.hud,
     fontSize: 14,
     fontWeight: FontWeight.w700,
@@ -48,7 +53,7 @@ class AppTextStyles {
   );
 
   /// Small dim labels above a value, e.g. "HUNTER", "DAILY XP".
-  static const TextStyle hudLabel = TextStyle(
+  static TextStyle get hudLabel => TextStyle(
     fontFamily: AppFonts.hud,
     fontSize: 11,
     fontWeight: FontWeight.w600,
@@ -57,7 +62,7 @@ class AppTextStyles {
   );
 
   /// Numeric readouts — XP counts, progress figures.
-  static const TextStyle readout = TextStyle(
+  static TextStyle get readout => TextStyle(
     fontFamily: AppFonts.hud,
     fontSize: 15,
     fontWeight: FontWeight.w700,
@@ -69,7 +74,7 @@ class AppTextStyles {
   );
 
   /// The player's name in the status header.
-  static const TextStyle hunterName = TextStyle(
+  static TextStyle get hunterName => TextStyle(
     fontFamily: AppFonts.display,
     fontSize: 17,
     fontWeight: FontWeight.w700,
@@ -78,7 +83,7 @@ class AppTextStyles {
   );
 
   /// A quest's title — the one place we prioritise plain readability.
-  static const TextStyle questTitle = TextStyle(
+  static TextStyle get questTitle => TextStyle(
     fontFamily: AppFonts.body,
     fontSize: 15,
     fontWeight: FontWeight.w500,
@@ -87,7 +92,7 @@ class AppTextStyles {
   );
 
   /// The "+10 XP" badge on a quest row.
-  static const TextStyle xpBadge = TextStyle(
+  static TextStyle get xpBadge => TextStyle(
     fontFamily: AppFonts.hud,
     fontSize: 13,
     fontWeight: FontWeight.w700,
@@ -100,7 +105,7 @@ class AppTextStyles {
   ///
   /// Amber by default because in this palette gold means "earned / reward /
   /// time remaining", and counters are almost always one of those.
-  static const TextStyle counter = TextStyle(
+  static TextStyle get counter => TextStyle(
     fontFamily: AppFonts.mono,
     fontSize: 15,
     fontWeight: FontWeight.w400,
@@ -110,7 +115,7 @@ class AppTextStyles {
   );
 
   /// General body copy.
-  static const TextStyle body = TextStyle(
+  static TextStyle get body => TextStyle(
     fontFamily: AppFonts.body,
     fontSize: 14,
     fontWeight: FontWeight.w400,

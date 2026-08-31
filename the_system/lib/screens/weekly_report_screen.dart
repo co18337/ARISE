@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/repositories/player_repository.dart';
 import '../models/models.dart';
 import '../theme/theme.dart';
-import '../widgets/hex_badge.dart';
+import '../game/game.dart';
+import '../widgets/achievement_badge.dart';
 import '../widgets/hud_entrance.dart';
 import '../widgets/hud_section_title.dart';
 import '../widgets/stat_bar.dart';
@@ -14,8 +15,10 @@ import '../widgets/system_panel.dart';
 ///
 /// Built on the existing rollup queries rather than a placeholder, because the
 /// data already exists — there was no reason to stub a screen we can fill.
-/// The achievement grid is the one part still waiting on Phase 7, so the
-/// badges show as locked and are honest about it.
+///
+/// The medal case at the bottom is LIFETIME, not weekly, and says so: medals
+/// measure the whole journey, and resetting them every Monday would make them
+/// worthless.
 class WeeklyReportScreen extends StatefulWidget {
   final PlayerRepository playerRepository;
 
@@ -49,7 +52,7 @@ class _WeeklyReportScreenState extends State<WeeklyReportScreen> {
                 parent: AlwaysScrollableScrollPhysics(),
               ),
               children: [
-                const HudSectionTitle('WEEKLY REPORT', accent: AppColors.accentGold),
+                HudSectionTitle('WEEKLY REPORT', accent: AppColors.accentGold),
                 const SizedBox(height: 18),
                 HudEntrance(index: 0, child: _AdherencePanel(week: week)),
                 const SizedBox(height: 14),
@@ -85,7 +88,16 @@ class _WeeklyReportScreenState extends State<WeeklyReportScreen> {
                 const SizedBox(height: 22),
                 const HudSectionTitle('ACHIEVEMENTS'),
                 const SizedBox(height: 14),
-                const HudEntrance(index: 3, child: _AchievementGrid()),
+                HudEntrance(
+                  index: 3,
+                  child: _AchievementGrid(
+                    // Empty metrics until the stream lands, so the case still
+                    // renders its locked medals on the very first frame.
+                    achievements: evaluateAchievements(
+                      player?.metrics ?? AchievementMetrics.empty,
+                    ),
+                  ),
+                ),
               ],
             );
           },
@@ -187,49 +199,30 @@ class _StatBreakdown extends StatelessWidget {
 /// Placeholder achievement grid — the badges are real widgets, the unlock
 /// logic lands in Phase 7.
 class _AchievementGrid extends StatelessWidget {
-  const _AchievementGrid();
+  final List<AchievementProgress> achievements;
+
+  const _AchievementGrid({required this.achievements});
 
   @override
   Widget build(BuildContext context) {
+    final earned = achievements.where((a) => a.earned).length;
+
     return SystemPanel(
+      title: 'Medals · lifetime',
       glow: 0.18,
       child: Column(
         children: [
           Wrap(
             alignment: WrapAlignment.center,
-            spacing: 14,
-            runSpacing: 14,
-            children: const [
-              HexBadge(
-                icon: Icons.local_fire_department,
-                label: '7 day streak',
-                tier: BadgeTier.bronze,
-              ),
-              HexBadge(
-                icon: Icons.verified,
-                label: 'Perfect week',
-                tier: BadgeTier.silver,
-              ),
-              HexBadge(
-                icon: Icons.trending_up,
-                label: 'Rank D',
-                tier: BadgeTier.gold,
-              ),
-              HexBadge(
-                icon: Icons.bolt,
-                label: '1000 XP',
-                tier: BadgeTier.platinum,
-              ),
-              HexBadge(
-                icon: Icons.workspace_premium,
-                label: 'Rank S',
-                tier: BadgeTier.apex,
-              ),
+            spacing: 10,
+            runSpacing: 16,
+            children: [
+              for (final a in achievements) AchievementBadge(progress: a),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Text(
-            'UNLOCK CONDITIONS ARRIVE IN PHASE 7',
+            '$earned OF ${achievements.length} MEDALS STARTED',
             textAlign: TextAlign.center,
             style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
           ),
@@ -238,3 +231,4 @@ class _AchievementGrid extends StatelessWidget {
     );
   }
 }
+

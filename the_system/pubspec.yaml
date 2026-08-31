@@ -40,6 +40,14 @@ dependencies:
   # imports it directly, and depending on a transitive package by accident is
   # how a build breaks on someone else's machine.
   path_provider: ^2.1.5
+  # Renders the bundled game-icons.net SVGs. Pure Dart (no native code), so it
+  # cannot drag in the platform build problems google_fonts did.
+  flutter_svg: ^2.0.10
+  # Reads the gitignored assets/config/.env at runtime, so the Gemini key can
+  # be dropped in without rebuilding or editing any Dart.
+  flutter_dotenv: ^5.1.0
+  # The Gemini REST call. Pure Dart, no platform channels.
+  http: ^1.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -58,6 +66,21 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+
+  # Emblem and stat artwork. SVG, single-path, white-on-transparent, so one
+  # file recolours to any rank or stat tier at runtime.
+  # Source + licence: see assets/icons/CREDITS.md (CC BY 3.0 — attribution is
+  # required and is shown in-app on the BACKUP screen).
+  assets:
+    - assets/icons/
+    - assets/badges/
+    # A DIRECTORY, not a file: `.env` is gitignored and may not exist on a
+    # fresh clone, and Flutter fails the build on a missing named asset but
+    # not on a directory that happens to be missing one.
+    - assets/config/
+    # Exercise demonstration animations. Mostly empty for now — see the README
+    # in there; each exercise falls back to its written cue without one.
+    - assets/exercises/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

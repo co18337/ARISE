@@ -13,12 +13,12 @@ class HudBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         gradient: RadialGradient(
-          center: Alignment(0, -1.1), // bloom originates above the screen
+          center: const Alignment(0, -1.1), // bloom originates above the screen
           radius: 1.3,
-          colors: [Color(0x2211304A), AppColors.background],
+          colors: [AppColors.bloom, AppColors.background],
         ),
       ),
       // RepaintBoundary keeps the static grid from being repainted every

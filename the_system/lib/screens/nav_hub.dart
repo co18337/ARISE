@@ -9,10 +9,15 @@ import '../widgets/hud_overlay_scaffold.dart';
 /// The destinations the hub navigates between.
 enum AppSection {
   quests('DAILY QUESTS', Icons.checklist_rtl),
+  training('TRAINING', Icons.fitness_center),
   status('STATUS', Icons.insights),
   weeklyReport('REPORT', Icons.assessment_outlined),
   activityLog('LOG', Icons.forum_outlined),
-  backup('BACKUP', Icons.save_alt);
+  memory('MEMORY', Icons.psychology_outlined),
+  backup('BACKUP', Icons.save_alt),
+
+  /// DEV ONLY — remove with BadgeGalleryScreen once badge picks are settled.
+  badges('BADGES', Icons.military_tech_outlined);
 
   final String label;
   final IconData icon;
@@ -33,31 +38,64 @@ class NavHub extends StatelessWidget {
 
   const NavHub({super.key, required this.current});
 
-  static const double _radius = 88;
-  static const double _button = 64;
+  static const double _button = 58;
+
+  /// Width budget for one destination — the ring, and the label under it.
+  /// Labels are what actually collide: "DAILY QUESTS" is far wider than the
+  /// button it sits beneath.
+  static const double _cell = 86;
+
+  /// Radius that keeps adjacent cells from overlapping.
+  ///
+  /// The chord between two neighbours on a circle of radius r is
+  /// 2r·sin(pi/n), so the radius has to GROW with the number of destinations.
+  /// It was a constant 88 while there were four; at seven that put two
+  /// buttons on top of each other and taps landed on the wrong screen.
+  static double _radiusFor(int count) {
+    if (count < 2) return 0;
+    final needed = _cell / (2 * math.sin(math.pi / count));
+    return needed < 88 ? 88 : needed;
+  }
 
   @override
   Widget build(BuildContext context) {
     const sections = AppSection.values;
-    const boxSize = (_radius * 2) + _button + 30;
+    final radius = _radiusFor(sections.length);
+    final boxSize = (radius * 2) + _cell + 16;
 
     return HudOverlayScaffold(
       title: 'NAV',
       child: Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: const Duration(milliseconds: 420),
-          curve: Curves.easeOutBack,
-          builder: (context, t, _) => SizedBox(
-            width: boxSize,
-            height: boxSize,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const _HubCore(),
-                for (var i = 0; i < sections.length; i++)
-                  _radialButton(context, sections[i], i, sections.length, t),
-              ],
+        // The ring grows with the number of destinations, so on a narrow
+        // phone it can outgrow the screen. Scaling down beats clipping, and
+        // beats abandoning the radial layout for a grid.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutBack,
+              builder: (context, t, _) => SizedBox(
+                width: boxSize,
+                height: boxSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const _HubCore(),
+                    for (var i = 0; i < sections.length; i++)
+                      _radialButton(
+                        context,
+                        sections[i],
+                        i,
+                        sections.length,
+                        t,
+                        radius,
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -71,26 +109,32 @@ class NavHub extends StatelessWidget {
     int index,
     int count,
     double t,
+    double radius,
   ) {
     // Start at -90° so the first button sits at the top, then step evenly
     // around the circle.
     final angle = -math.pi / 2 + (2 * math.pi * index / count);
-    final r = _radius * t;
+    final r = radius * t;
 
     return Transform.translate(
       offset: Offset(r * math.cos(angle), r * math.sin(angle)),
       child: Opacity(
         opacity: t.clamp(0.0, 1.0),
-        child: HudCircleButton(
-          icon: section.icon,
-          label: section.label,
-          size: _button,
-          // The section you're already on is highlighted rather than disabled,
-          // so the hub always shows where you are as well as where you can go.
-          accent: section == current
-              ? AppColors.accentGold
-              : AppColors.primary,
-          onTap: () => Navigator.of(context).pop(section),
+        child: SizedBox(
+          // Fixed cell width so a long label cannot spill into its neighbour.
+          width: _cell,
+          child: HudCircleButton(
+            icon: section.icon,
+            label: section.label,
+            size: _button,
+            // The section you're already on is highlighted rather than
+            // disabled, so the hub always shows where you are as well as
+            // where you can go.
+            accent: section == current
+                ? AppColors.accentGold
+                : AppColors.primary,
+            onTap: () => Navigator.of(context).pop(section),
+          ),
         ),
       ),
     );

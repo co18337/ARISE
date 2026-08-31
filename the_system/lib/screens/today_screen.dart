@@ -13,7 +13,9 @@ import '../widgets/hud_entrance.dart';
 import '../widgets/hud_section_title.dart';
 import '../widgets/routine_step_tile.dart';
 import '../widgets/stat_bar.dart';
+import '../widgets/hud_route.dart';
 import '../widgets/system_panel.dart';
+import 'daily_report_overlay.dart';
 
 /// The DAILY QUESTS screen — the day as a guided routine.
 ///
@@ -30,10 +32,15 @@ class TodayScreen extends StatefulWidget {
   /// Opens the weekly report — used by the claim button once the day is done.
   final VoidCallback? onOpenReport;
 
+  /// Opens the full training session. The routine's workout step is one tick;
+  /// the session behind it is the actual exercises.
+  final VoidCallback? onOpenTraining;
+
   const TodayScreen({
     super.key,
     required this.questRepository,
     this.onOpenReport,
+    this.onOpenTraining,
   });
 
   @override
@@ -221,12 +228,14 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
                         : '$pending quests remaining',
                     icon: dayAnswered ? Icons.verified : null,
                     colors: dayAnswered
-                        ? const [AppColors.accentGold, AppColors.accentMagenta]
-                        : const [AppColors.accentPurple, AppColors.primary],
+                        ? [AppColors.accentGold, AppColors.accentMagenta]
+                        : [AppColors.accentPurple, AppColors.primary],
                     // Deliberately NOT a "tick everything" shortcut — that
                     // would be cheating the whole point. It opens the day's
-                    // report once every step has an answer.
-                    onPressed: dayAnswered ? widget.onOpenReport : null,
+                    // debrief once every step has an answer.
+                    onPressed: dayAnswered
+                        ? () => _openDailyReport(tasks)
+                        : null,
                   ),
                 ),
               ],
@@ -250,12 +259,17 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
         ? null
         : _firstLocked(routine);
 
-    return SystemPanel(
-      title: 'Routine',
-      glow: 0.22,
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
-      child: Column(
-        children: [
+    // No outer panel: the steps are cards in their own right now, and a panel
+    // around a column of cards is a box inside a box. A plain section label
+    // does the same job with far less furniture.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 10),
+          child: Text('ROUTINE', style: AppTextStyles.panelTitle),
+        ),
+        ...[
           for (final step in routine) ...[
             if (identical(step, waitingFor))
               Padding(
@@ -275,6 +289,12 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
                   closesAt: _windowCloseTime(step.task),
                   onDone: () => _answer(step.task, QuestStatus.done),
                   onMissed: () => _answer(step.task, QuestStatus.missed),
+                  // Only the workout step has somewhere deeper to go.
+                  onOpenDetail:
+                      step.task.template.id == 'workout_of_the_day'
+                      ? widget.onOpenTraining
+                      : null,
+                  detailLabel: 'OPEN TRAINING',
                 ),
               )
             else
@@ -287,7 +307,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
               ),
           ],
         ],
-      ),
+      ],
     );
   }
 
@@ -297,6 +317,19 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
       if (step.state == RoutineState.locked) return step;
     }
     return null;
+  }
+
+  /// Closing the day should be an event, not the list quietly going grey.
+  void _openDailyReport(List<DailyTask> tasks) {
+    Navigator.of(context).push(
+      hudRoute(
+        DailyReportOverlay(
+          date: _today,
+          tasks: tasks,
+          onOpenWeek: widget.onOpenReport,
+        ),
+      ),
+    );
   }
 
   /// A resolved step can be un-answered only while its window is still open.
@@ -344,16 +377,15 @@ class _WaitingCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: ShapeDecoration(
         color: AppColors.primary.withValues(alpha: 0.05),
-        shape: ChamferBorder(
-          cut: 10,
+        shape: AppShapes.row(
           side: BorderSide(
-            color: AppColors.primary.withValues(alpha: 0.35),
+            color: AppColors.primary.withValues(alpha: 0.45),
           ),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.hourglass_empty,
             size: 16,
             color: AppColors.primary,
@@ -477,7 +509,7 @@ class _XpBurst extends StatelessWidget {
             style: AppTextStyles.display.copyWith(
               fontSize: 30,
               color: AppColors.accentGold,
-              shadows: const [
+              shadows: [
                 BoxShadow(color: AppColors.accentGold, blurRadius: 22),
               ],
             ),

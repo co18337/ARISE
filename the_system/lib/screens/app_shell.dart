@@ -4,15 +4,22 @@ import '../data/export/export_repository.dart';
 import '../data/repositories/activity_repository.dart';
 import '../data/repositories/player_repository.dart';
 import '../data/repositories/quest_repository.dart';
+import '../data/memory/memory_repository.dart';
+import '../data/repositories/workout_repository.dart';
 import '../theme/theme.dart';
 import '../widgets/animated_counter.dart';
 import '../widgets/hud_backdrop.dart';
 import '../widgets/hud_route.dart';
 import '../widgets/rank_header.dart';
+import '../widgets/theme_toggle_button.dart';
 import 'activity_log_screen.dart';
 import 'backup_screen.dart';
+import 'badge_gallery_screen.dart';
 import 'nav_hub.dart';
+import 'reward_overlay.dart';
 import 'status_screen.dart';
+import 'memory_screen.dart';
+import 'training_screen.dart';
 import 'today_screen.dart';
 import 'weekly_report_screen.dart';
 
@@ -30,6 +37,13 @@ class AppShell extends StatefulWidget {
   final PlayerRepository playerRepository;
   final ActivityRepository activityRepository;
   final ExportRepository exportRepository;
+  final WorkoutRepository workoutRepository;
+  final MemoryRepository memoryRepository;
+
+  /// The look currently in force, and the way to change it. Owned by MyApp,
+  /// because switching theme rebuilds everything below it.
+  final AppThemeMode themeMode;
+  final ValueChanged<AppThemeMode> onThemeModeChanged;
 
   const AppShell({
     super.key,
@@ -37,6 +51,10 @@ class AppShell extends StatefulWidget {
     required this.playerRepository,
     required this.activityRepository,
     required this.exportRepository,
+    required this.workoutRepository,
+    required this.memoryRepository,
+    required this.themeMode,
+    required this.onThemeModeChanged,
   });
 
   @override
@@ -46,9 +64,34 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   AppSection _section = AppSection.quests;
 
+  /// Guards against pushing a second reward overlay while one is up.
+  ///
+  /// The player stream re-emits on every write, and acknowledging a reward is
+  /// itself a write — without this the modal would re-enter itself.
+  bool _showingRewards = false;
+
   // Owned by the shell so the header keeps its value across section changes.
   late final Stream<PlayerSnapshot> _playerStream =
       widget.playerRepository.watch();
+
+  /// Shows anything earned but not yet celebrated, then records it as seen.
+  ///
+  /// Driven off the player stream rather than from the places that grant XP:
+  /// a level-up can arrive from a quest, a training session or a backfill, and
+  /// one place that notices is better than three that might not.
+  Future<void> _showPendingRewards(PlayerSnapshot player) async {
+    if (_showingRewards) return;
+    final events = player.pending;
+    if (events.isEmpty) return;
+
+    _showingRewards = true;
+    try {
+      await Navigator.of(context).push(hudRoute(RewardOverlay(events: events)));
+      await widget.playerRepository.acknowledgeRewards();
+    } finally {
+      _showingRewards = false;
+    }
+  }
 
   Future<void> _openHub() async {
     final chosen = await Navigator.of(context).push<AppSection>(
@@ -65,6 +108,18 @@ class _AppShellState extends State<AppShell> {
         key: const ValueKey('quests'),
         questRepository: widget.questRepository,
         onOpenReport: () => setState(() => _section = AppSection.weeklyReport),
+        onOpenTraining: () => setState(() => _section = AppSection.training),
+      ),
+      AppSection.training => TrainingScreen(
+        key: const ValueKey('training'),
+        workoutRepository: widget.workoutRepository,
+        // Finishing the session clears the routine's workout step, so the same
+        // commitment is never ticked twice. Async and awaited by the screen:
+        // this is the call that awards the XP.
+        onSessionCompleted: () async => widget.questRepository.completeTemplate(
+          'workout_of_the_day',
+          widget.workoutRepository.clock.now(),
+        ),
       ),
       AppSection.status => StatusScreen(
         key: const ValueKey('status'),
@@ -77,6 +132,12 @@ class _AppShellState extends State<AppShell> {
       AppSection.activityLog => ActivityLogScreen(
         key: const ValueKey('log'),
         activityRepository: widget.activityRepository,
+      ),
+      // DEV ONLY — see BadgeGalleryScreen.
+      AppSection.badges => const BadgeGalleryScreen(key: ValueKey('badges')),
+      AppSection.memory => MemoryScreen(
+        key: const ValueKey('memory'),
+        memoryRepository: widget.memoryRepository,
       ),
       AppSection.backup => BackupScreen(
         // Keyed by nothing else, so leaving and returning rebuilds the export
@@ -97,9 +158,25 @@ class _AppShellState extends State<AppShell> {
             builder: (context, snapshot) {
               final player = snapshot.data;
 
+              // After the frame, not during it: pushing a route from inside
+              // build() throws.
+              if (player != null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _showPendingRewards(player);
+                });
+              }
+
               return Column(
                 children: [
-                  RankHeader(player: player),
+                  RankHeader(
+                    player: player,
+                    // Top-right of every screen: the header is the only strip
+                    // that is always on screen.
+                    trailing: ThemeToggleButton(
+                      mode: widget.themeMode,
+                      onChanged: widget.onThemeModeChanged,
+                    ),
+                  ),
                   Expanded(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 280),
@@ -128,7 +205,7 @@ class _ShellBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.primaryDim, width: 1)),
       ),
@@ -193,7 +270,7 @@ class _HubButton extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(Icons.blur_circular, color: AppColors.primary, size: 24),
+          child: Icon(Icons.blur_circular, color: AppColors.primary, size: 24),
         ),
       ),
     );

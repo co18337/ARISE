@@ -8,12 +8,16 @@ import '../theme/theme.dart';
 /// wherever they appear.
 class HudSectionTitle extends StatelessWidget {
   final String text;
-  final Color accent;
+  final Color? accent;
 
-  const HudSectionTitle(this.text, {super.key, this.accent = AppColors.primary});
+  // Nullable rather than defaulted: a default parameter value must be a
+  // compile-time constant, and palette colours are now runtime getters so the
+  // theme can be swapped. Resolved in build() instead.
+  const HudSectionTitle(this.text, {super.key, this.accent});
 
   @override
   Widget build(BuildContext context) {
+    final Color accent = this.accent ?? AppColors.primary;
     final Widget rule = Expanded(
       child: Container(height: 1, color: accent.withValues(alpha: 0.3)),
     );

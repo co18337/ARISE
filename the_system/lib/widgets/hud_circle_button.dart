@@ -12,7 +12,7 @@ class HudCircleButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final Color accent;
+  final Color? accent;
   final double size;
 
   /// Shows a small dot on the ring — "there is something unseen in here".
@@ -23,7 +23,7 @@ class HudCircleButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.onTap,
-    this.accent = AppColors.primary,
+    this.accent,
     this.size = 62,
     this.showBadge = false,
   });
@@ -33,7 +33,8 @@ class HudCircleButton extends StatelessWidget {
     // A disabled button stays visible but clearly inert, so the menu shows
     // what exists in the app even before a screen is built.
     final bool enabled = onTap != null;
-    final Color color = enabled ? accent : AppColors.textDim;
+    final Color color =
+        enabled ? (accent ?? AppColors.primary) : AppColors.textDim;
 
     return Semantics(
       button: true,
@@ -96,7 +97,17 @@ class HudCircleButton extends StatelessWidget {
               const SizedBox(height: 7),
               Text(
                 label,
-                style: AppTextStyles.hudLabel.copyWith(color: color),
+                textAlign: TextAlign.center,
+                // Two lines: the hub gives each destination a fixed-width
+                // cell, and a long label has to wrap inside it rather than
+                // overlap the button next to it.
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.hudLabel.copyWith(
+                  color: color,
+                  fontSize: 10,
+                  letterSpacing: 1.4,
+                ),
               ),
             ],
           ),

@@ -101,11 +101,13 @@ class _BackupScreenState extends State<BackupScreen> {
                 child: GradientButton(
                   label: 'Save to file',
                   icon: Icons.save_alt,
-                  colors: const [AppColors.accentGold, AppColors.accentMagenta],
+                  colors: [AppColors.accentGold, AppColors.accentMagenta],
                   onPressed: () => _save(backup),
                 ),
               ),
             ],
+            const SizedBox(height: 18),
+            const _Credits(),
             if (_message != null) ...[
               const SizedBox(height: 16),
               Text(
@@ -119,6 +121,38 @@ class _BackupScreenState extends State<BackupScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Attribution for the bundled emblem artwork.
+///
+/// CC BY 3.0 requires the credit to actually be visible to whoever uses the
+/// app, which a line in a repo file is not. It also goes into
+/// LicenseRegistry — see main.dart.
+class _Credits extends StatelessWidget {
+  const _Credits();
+
+  @override
+  Widget build(BuildContext context) {
+    return SystemPanel(
+      title: 'Credits',
+      glow: 0.12,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Rank crests, stat emblems and achievement medals are from '
+            'game-icons.net, by Lorc, Delapouite and sbed.',
+            style: AppTextStyles.body,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Licensed CC BY 3.0 · creativecommons.org/licenses/by/3.0',
+            style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -170,7 +204,7 @@ class _Preview extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Text(
             lines,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: AppFonts.mono,
               fontSize: 11,
               height: 1.5,

@@ -13,7 +13,7 @@ class StatBar extends StatelessWidget {
 
   final int value;
   final int max;
-  final Color color;
+  final Color? color;
 
   /// Optional text on the right. Defaults to "value / max".
   final String? trailingText;
@@ -38,7 +38,7 @@ class StatBar extends StatelessWidget {
     required this.label,
     required this.value,
     required this.max,
-    this.color = AppColors.primary,
+    this.color,
     this.trailingText,
     this.height = 8,
     this.showHeader = true,
@@ -48,6 +48,7 @@ class StatBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color barColor = color ?? AppColors.primary;
     // Guard against divide-by-zero on a day with no scheduled quests.
     final double fraction = max <= 0 ? 0 : (value / max).clamp(0.0, 1.0);
 
@@ -84,7 +85,7 @@ class StatBar extends StatelessWidget {
           curve: Curves.easeOutCubic,
           builder: (context, animatedFraction, _) => _BarTrack(
             fraction: animatedFraction,
-            color: showEarnedRemaining ? AppColors.accentGold : color,
+            color: showEarnedRemaining ? AppColors.accentGold : barColor,
             trackColor: showEarnedRemaining
                 ? AppColors.remaining.withValues(alpha: 0.22)
                 : AppColors.surfaceRaised,
@@ -163,19 +164,37 @@ class _BarTrack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Fully round ends. Square-ended bars looked deliberate next to cut
+    // corners; next to rounded cards they just look unfinished.
+    final radius = BorderRadius.circular(height);
+
     return Container(
       height: height,
       decoration: BoxDecoration(
         color: trackColor,
+        borderRadius: radius,
         border: Border.all(color: color.withValues(alpha: 0.30), width: 1),
       ),
+      // Clips the fill and the tier ticks to the rounded track, so the fill
+      // can stay a plain rectangle and still end in a round cap.
+      clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
           // FractionallySizedBox fills a proportion of the parent's width,
           // which avoids measuring the track ourselves with a LayoutBuilder.
+          //
+          // heightFactor: 1 is load-bearing, not decoration. A Stack lays its
+          // non-positioned children out with LOOSE constraints, so without it
+          // the child is free to be as short as it likes — and a DecoratedBox
+          // with no child of its own takes the smallest size allowed, which is
+          // zero height. The fill was invisible in every bar in the app: a
+          // 4/4 session showed an empty track. The tick marks below never had
+          // the bug because Align expands to fill bounded constraints where
+          // DecoratedBox does not.
           FractionallySizedBox(
             alignment: Alignment.centerLeft,
             widthFactor: fraction,
+            heightFactor: 1,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 // Gradient brightens toward the leading edge so the bar looks

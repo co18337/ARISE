@@ -21,17 +21,18 @@ class StatRow {
 class StatListPanel extends StatelessWidget {
   final String title;
   final List<StatRow> rows;
-  final Color accent;
+  final Color? accent;
 
   const StatListPanel({
     super.key,
     required this.title,
     required this.rows,
-    this.accent = AppColors.primary,
+    this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Color accent = this.accent ?? AppColors.primary;
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface.withValues(alpha: 0.55),

@@ -156,8 +156,9 @@ class _ActivityRow extends StatelessWidget {
             alignment: Alignment.center,
             decoration: ShapeDecoration(
               color: color.withValues(alpha: 0.12),
-              shape: ChamferBorder(
-                cut: 6,
+              // A circle at 26px: a rounded square this small just reads as a
+              // slightly wrong square.
+              shape: CircleBorder(
                 side: BorderSide(color: color.withValues(alpha: 0.7)),
               ),
             ),

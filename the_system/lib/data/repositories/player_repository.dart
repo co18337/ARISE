@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../game/game.dart';
+import '../../theme/app_colors.dart' show AppThemeMode;
 import '../../models/models.dart';
 import '../day_key.dart';
 import '../db/database.dart';
@@ -84,10 +85,15 @@ class PlayerSnapshot {
   final int longestStreak;
   final int perfectDays;
 
-  /// The last level the player has actually been shown a celebration for.
-  /// When it trails [level] there's an unseen level-up — Phase 6 will use this
-  /// to fire the modal exactly once.
+  /// Lifetime quests cleared — one of the metrics medals are earned against.
+  final int questsCleared;
+
+  /// What the player has actually been shown a celebration for. When these
+  /// trail what has been earned, there is a modal owing — which is what makes
+  /// a level-up fire exactly once and survive a restart.
   final int acknowledgedLevel;
+  final Rank acknowledgedRank;
+  final Map<AchievementId, AchievementTier> acknowledgedMedals;
 
   const PlayerSnapshot({
     required this.hunterName,
@@ -96,7 +102,10 @@ class PlayerSnapshot {
     required this.currentStreak,
     required this.longestStreak,
     required this.perfectDays,
+    required this.questsCleared,
     required this.acknowledgedLevel,
+    this.acknowledgedRank = Rank.e,
+    this.acknowledgedMedals = const {},
   });
 
   LevelProgress get progress => GameRules.hunter.progressFor(totalXp);
@@ -111,6 +120,31 @@ class PlayerSnapshot {
 
   /// True when the player has levelled up without seeing the celebration yet.
   bool get hasUnseenLevelUp => level > acknowledgedLevel;
+
+  /// Everything earned but not yet celebrated, smallest moment first.
+  List<RewardEvent> get pending => pendingRewards(
+    totalXp: totalXp,
+    curve: GameRules.hunter,
+    achievements: achievements,
+    seen: AcknowledgedRewards(
+      level: acknowledgedLevel,
+      rank: acknowledgedRank,
+      medals: acknowledgedMedals,
+    ),
+  );
+
+  /// What the medals are measured against.
+  AchievementMetrics get metrics => AchievementMetrics(
+    longestStreak: longestStreak,
+    perfectDays: perfectDays,
+    questsCleared: questsCleared,
+    totalXp: totalXp,
+    statXp: statXp,
+  );
+
+  /// Every medal's standing. Computed, never stored — a medal that disagreed
+  /// with the record that earned it would be worse than no medal.
+  List<AchievementProgress> get achievements => evaluateAchievements(metrics);
 }
 
 /// Read access to the single player-state row.
@@ -124,6 +158,45 @@ class PlayerRepository {
       (db.select(db.playerStates)..where((p) => p.id.equals(0)))
           .watchSingle()
           .map(_toSnapshot);
+
+  /// The saved look, or dark on a value this build no longer recognises.
+  ///
+  /// Stored as the enum's NAME, so reordering AppThemeMode later cannot
+  /// silently turn "warm" into "auto" — the same reason the enum columns in
+  /// the schema use textEnum.
+  Future<AppThemeMode> readThemeMode() async {
+    final row = await (db.select(db.playerStates)..where((p) => p.id.equals(0)))
+        .getSingle();
+    return AppThemeMode.values.firstWhere(
+      (m) => m.name == row.themeMode,
+      orElse: () => AppThemeMode.dark,
+    );
+  }
+
+  Future<void> setThemeMode(AppThemeMode mode) =>
+      (db.update(db.playerStates)..where((p) => p.id.equals(0)))
+          .write(PlayerStatesCompanion(themeMode: Value(mode.name)));
+
+  /// Records that everything currently earned has been celebrated.
+  ///
+  /// Written as one update from the CURRENT snapshot rather than per event, so
+  /// dismissing the modal can never leave half a reward unacknowledged and fire
+  /// it again on the next launch.
+  Future<void> acknowledgeRewards() async {
+    final player = await read();
+    await (db.update(db.playerStates)..where((p) => p.id.equals(0))).write(
+      PlayerStatesCompanion(
+        acknowledgedLevel: Value(player.level),
+        acknowledgedRank: Value(player.rank.label),
+        acknowledgedMedals: Value(
+          encodeAcknowledgedMedals({
+            for (final a in player.achievements)
+              if (a.tier != null) a.id: a.tier!,
+          }),
+        ),
+      ),
+    );
+  }
 
   Future<PlayerSnapshot> read() async =>
       _toSnapshot(await (db.select(db.playerStates)
@@ -212,6 +285,12 @@ class PlayerRepository {
     currentStreak: r.currentStreak,
     longestStreak: r.longestStreak,
     perfectDays: r.perfectDays,
+    questsCleared: r.questsCleared,
     acknowledgedLevel: r.acknowledgedLevel,
+    acknowledgedRank: Rank.values
+            .where((rank) => rank.label == r.acknowledgedRank)
+            .firstOrNull ??
+        Rank.e,
+    acknowledgedMedals: decodeAcknowledgedMedals(r.acknowledgedMedals),
   );
 }

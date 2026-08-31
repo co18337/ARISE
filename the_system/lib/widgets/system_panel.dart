@@ -3,10 +3,16 @@ import 'package:flutter/material.dart';
 import '../theme/theme.dart';
 
 /// The building block of the whole UI: a dark, semi-transparent card with a
-/// thin glowing cut-corner border — the Solo Leveling "status window".
+/// soft rounded border and a faint glow.
 ///
 /// Every panel on every screen should be one of these, so the look stays
 /// consistent as more screens get added.
+///
+/// The corner brackets and the 45° notch this used to have are gone. Both were
+/// trying to signal "HUD" through geometry, and at real size on a phone they
+/// just made every surface look slightly broken. The signal now comes from the
+/// palette, the glow and the letter-spacing — which is where it was always
+/// doing the actual work.
 class SystemPanel extends StatelessWidget {
   /// Optional heading, rendered uppercase in the HUD label style.
   final String? title;
@@ -14,45 +20,44 @@ class SystemPanel extends StatelessWidget {
   final Widget child;
 
   /// Border/glow colour. Defaults to the signature cyan; pass gold or purple
-  /// for a rank or level-up panel later.
-  final Color accent;
+  /// for a rank or level-up panel.
+  final Color? accent;
 
-  /// How strong the outer glow is, 0..1. Kept low by default — the glow
-  /// should suggest emission, not look like a blur bug.
+  /// How strong the outer glow is, 0..1. Kept low by default — the glow should
+  /// suggest emission, not look like a blur bug.
   final double glow;
 
   final EdgeInsetsGeometry padding;
 
-  /// Draws small L-shaped brackets at the square corners (a tactical-overlay
-  /// touch borrowed from Ingress-style HUDs).
-  final bool showCornerBrackets;
+  /// Draws the heading's leading tick and hairline rule. Off for plain cards.
+  final bool showTitleRule;
 
   const SystemPanel({
     super.key,
     this.title,
     required this.child,
-    this.accent = AppColors.primary,
+    this.accent,
     this.glow = 0.30,
     this.padding = const EdgeInsets.all(16),
-    this.showCornerBrackets = true,
+    this.showTitleRule = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Widget panel = DecoratedBox(
+    final Color accent = this.accent ?? AppColors.primary;
+    return DecoratedBox(
       // ShapeDecoration (rather than BoxDecoration) so the fill, the 1px
-      // border and the outer glow all follow the chamfered outline.
+      // border and the outer glow all follow the same rounded outline.
       decoration: ShapeDecoration(
         color: AppColors.panelFill,
-        shape: ChamferBorder(
-          cut: 14,
-          side: BorderSide(color: accent.withValues(alpha: 0.55), width: 1),
+        shape: AppShapes.panel(
+          side: BorderSide(color: accent.withValues(alpha: 0.34), width: 1),
         ),
         shadows: [
           BoxShadow(
-            color: accent.withValues(alpha: glow * 0.5),
-            blurRadius: 18,
-            spreadRadius: -4,
+            color: accent.withValues(alpha: glow * 0.38),
+            blurRadius: 20,
+            spreadRadius: -6,
           ),
         ],
       ),
@@ -62,18 +67,15 @@ class SystemPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (title != null) ...[_PanelTitle(title!, accent: accent), const SizedBox(height: 12)],
+            if (title != null) ...[
+              _PanelTitle(title!, accent: accent, rule: showTitleRule),
+              const SizedBox(height: 12),
+            ],
             child,
           ],
         ),
       ),
     );
-
-    if (!showCornerBrackets) return panel;
-
-    // CustomPaint wraps the panel so the brackets draw on top of the border,
-    // right at its edges, without affecting layout.
-    return CustomPaint(foregroundPainter: _CornerBracketPainter(accent), child: panel);
   }
 }
 
@@ -82,8 +84,9 @@ class SystemPanel extends StatelessWidget {
 class _PanelTitle extends StatelessWidget {
   final String text;
   final Color accent;
+  final bool rule;
 
-  const _PanelTitle(this.text, {required this.accent});
+  const _PanelTitle(this.text, {required this.accent, required this.rule});
 
   @override
   Widget build(BuildContext context) {
@@ -94,54 +97,31 @@ class _PanelTitle extends StatelessWidget {
           height: 13,
           decoration: BoxDecoration(
             color: accent,
-            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.8), blurRadius: 6)],
+            borderRadius: BorderRadius.circular(2),
+            boxShadow: [
+              BoxShadow(color: accent.withValues(alpha: 0.8), blurRadius: 6),
+            ],
           ),
         ),
         const SizedBox(width: 8),
-        Text(text.toUpperCase(), style: AppTextStyles.panelTitle.copyWith(color: accent)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(height: 1, color: accent.withValues(alpha: 0.22)),
+        Flexible(
+          child: Text(
+            text.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.panelTitle.copyWith(color: accent),
+          ),
         ),
+        if (rule) ...[
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: accent.withValues(alpha: 0.18),
+            ),
+          ),
+        ],
       ],
     );
   }
-}
-
-/// Draws short L-brackets at the two square corners (top-right, bottom-left).
-/// The other two are chamfered, so brackets there would fight the cut.
-class _CornerBracketPainter extends CustomPainter {
-  final Color accent;
-
-  _CornerBracketPainter(this.accent);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const double len = 10;
-    final Paint p = Paint()
-      ..color = accent
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    // Top-right corner.
-    canvas.drawPath(
-      Path()
-        ..moveTo(size.width - len, 0)
-        ..lineTo(size.width, 0)
-        ..lineTo(size.width, len),
-      p,
-    );
-    // Bottom-left corner.
-    canvas.drawPath(
-      Path()
-        ..moveTo(0, size.height - len)
-        ..lineTo(0, size.height)
-        ..lineTo(len, size.height),
-      p,
-    );
-  }
-
-  // Only repaint if the colour actually changed.
-  @override
-  bool shouldRepaint(_CornerBracketPainter old) => old.accent != accent;
 }

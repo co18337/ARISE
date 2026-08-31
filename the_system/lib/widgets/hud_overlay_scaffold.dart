@@ -13,13 +13,13 @@ import 'hud_section_title.dart';
 class HudOverlayScaffold extends StatelessWidget {
   final String title;
   final Widget child;
-  final Color accent;
+  final Color? accent;
 
   const HudOverlayScaffold({
     super.key,
     required this.title,
     required this.child,
-    this.accent = AppColors.primary,
+    this.accent,
   });
 
   @override
@@ -69,7 +69,7 @@ class _CloseButton extends StatelessWidget {
                 color: AppColors.textSecondary.withValues(alpha: 0.6),
               ),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.close,
               color: AppColors.textSecondary,
               size: 22,

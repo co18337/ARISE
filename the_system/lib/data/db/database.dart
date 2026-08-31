@@ -3,8 +3,9 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 // database.g.dart is a `part of` this file, so it can only see the imports
-// declared HERE — that's why the model enums are imported even though this
-// file never names them directly.
+// declared HERE — that's why the model enums, and TrainingPhase from the game
+// engine, are imported even though this file never names them directly.
+import '../../game/game.dart';
 import '../../models/models.dart';
 import '../day_key.dart';
 import '../task_catalog.dart';
@@ -22,6 +23,10 @@ part 'database.g.dart';
     DayRollups,
     PlayerStates,
     ActivityLogEntries,
+    WorkoutSessions,
+    WorkoutSets,
+    MemoryDocuments,
+    MemoryChunks,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -30,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +53,33 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 3) {
         await _upgradeToRoutineSchema(m);
+      }
+      if (from < 4) {
+        // Purely additive. The value is backfilled by the first
+        // recomputeAll()/openToday() that runs, which rebuilds every cached
+        // total from daily_quests anyway.
+        await m.addColumn(playerStates, playerStates.questsCleared);
+      }
+      if (from < 5) {
+        // Purely additive, and it defaults to the look the app already had.
+        await m.addColumn(playerStates, playerStates.themeMode);
+      }
+      if (from < 6) {
+        // New tables plus one column; nothing existing is touched. The
+        // programme start stays null until the first session opens, which is
+        // what makes an upgraded database start at week 1 rather than
+        // inheriting a week number from data that never existed.
+        await m.createTable(workoutSessions);
+        await m.createTable(workoutSets);
+        await m.addColumn(playerStates, playerStates.programmeStartDay);
+      }
+      if (from < 7) {
+        // New tables only; nothing existing is touched.
+        await m.createTable(memoryDocuments);
+        await m.createTable(memoryChunks);
+      }
+      if (from < 8) {
+        await m.addColumn(playerStates, playerStates.acknowledgedMedals);
       }
     },
     beforeOpen: (details) async {

@@ -19,3 +19,6 @@
 # are the reason the app exists, and they must never be pushed anywhere.
 *.pdf
 /health/
+
+# macOS finder droppings.
+.DS_Store

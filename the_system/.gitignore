@@ -46,3 +46,16 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# ---------------------------------------------------------------------------
+# Secrets. The Gemini API key lives here and is NEVER committed.
+# `.env.example` is committed so the file's shape is known; `.env` is not.
+# ---------------------------------------------------------------------------
+assets/config/.env
+
+# ---------------------------------------------------------------------------
+# Exercise demonstration GIFs. Fetched locally by tool/fetch_exercise_gifs.sh,
+# never committed: the artwork is not mine to redistribute. Personal, local,
+# non-commercial use only. Run the script to get them on a new machine.
+# ---------------------------------------------------------------------------
+assets/exercises/*.gif

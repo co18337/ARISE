@@ -1,0 +1,239 @@
+{
+ "source": "https://github.com/hasaneyldrm/exercises-dataset",
+ "dataLicence": "MIT — Copyright (c) 2026 Hasan Emir Yildirim",
+ "note": "Exercise DATA only. The animation media in that repository is (c) Gym visual and is not redistributed here; see assets/exercises/README.md.",
+ "guides": {
+  "steady_run": {
+   "sourceId": "0685",
+   "sourceName": "run",
+   "equipment": "body weight",
+   "bodyPart": "cardio",
+   "target": "cardiovascular system",
+   "secondaryMuscles": [
+    "quadriceps",
+    "hamstrings",
+    "calves"
+   ],
+   "steps": [
+    "Start by standing upright with your feet hip-width apart.",
+    "Engage your core and keep your upper body relaxed.",
+    "Begin jogging in place, lifting your knees up towards your chest and landing softly on the balls of your feet.",
+    "Maintain a steady pace and continue jogging for the desired duration or distance.",
+    "Remember to breathe deeply and maintain good posture throughout the exercise."
+   ],
+   "gymVisualMedia": "oLrKqDH"
+  },
+  "sprint_interval": {
+   "sourceId": "0685",
+   "sourceName": "run",
+   "equipment": "body weight",
+   "bodyPart": "cardio",
+   "target": "cardiovascular system",
+   "secondaryMuscles": [
+    "quadriceps",
+    "hamstrings",
+    "calves"
+   ],
+   "steps": [
+    "Start by standing upright with your feet hip-width apart.",
+    "Engage your core and keep your upper body relaxed.",
+    "Begin jogging in place, lifting your knees up towards your chest and landing softly on the balls of your feet.",
+    "Maintain a steady pace and continue jogging for the desired duration or distance.",
+    "Remember to breathe deeply and maintain good posture throughout the exercise."
+   ],
+   "gymVisualMedia": "oLrKqDH"
+  },
+  "jumping_jacks": {
+   "sourceId": "3224",
+   "sourceName": "jack jump (male)",
+   "equipment": "body weight",
+   "bodyPart": "cardio",
+   "target": "cardiovascular system",
+   "secondaryMuscles": [
+    "quadriceps",
+    "calves"
+   ],
+   "steps": [
+    "Stand with your feet together and your arms by your sides.",
+    "Jump up, spreading your feet apart and raising your arms above your head.",
+    "As you land, quickly jump back to the starting position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "1g5bPpA"
+  },
+  "situps": {
+   "sourceId": "0735",
+   "sourceName": "sit-up v. 2",
+   "equipment": "body weight",
+   "bodyPart": "waist",
+   "target": "abs",
+   "secondaryMuscles": [
+    "hip flexors"
+   ],
+   "steps": [
+    "Lie flat on your back with your knees bent and feet flat on the ground.",
+    "Place your hands behind your head with your elbows pointing outwards.",
+    "Engaging your abs, slowly lift your upper body off the ground, curling forward until your torso is at a 45-degree angle.",
+    "Pause for a moment at the top, then slowly lower your upper body back down to the starting position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "Bn6TXyO"
+  },
+  "leg_raises": {
+   "sourceId": "0472",
+   "sourceName": "hanging leg raise",
+   "equipment": "body weight",
+   "bodyPart": "waist",
+   "target": "abs",
+   "secondaryMuscles": [
+    "hip flexors"
+   ],
+   "steps": [
+    "Hang from a pull-up bar with your arms fully extended and your palms facing away from you.",
+    "Engage your core and lift your legs up in front of you, keeping them straight.",
+    "Continue lifting until your legs are parallel to the ground or as high as you can comfortably go.",
+    "Pause for a moment at the top, then slowly lower your legs back down to the starting position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "I3tsCnC"
+  },
+  "pushups": {
+   "sourceId": "0662",
+   "sourceName": "push-up",
+   "equipment": "body weight",
+   "bodyPart": "chest",
+   "target": "pectorals",
+   "secondaryMuscles": [
+    "triceps",
+    "deltoids",
+    "core"
+   ],
+   "steps": [
+    "Start in a high plank position with your hands slightly wider than shoulder-width apart and your feet together.",
+    "Engage your core and lower your body towards the ground by bending your elbows, keeping your body in a straight line.",
+    "Pause for a moment when your chest is just above the ground, then push yourself back up to the starting position by straightening your arms.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "I4hDWkc"
+  },
+  "incline_pushups": {
+   "sourceId": "0493",
+   "sourceName": "incline push-up",
+   "equipment": "body weight",
+   "bodyPart": "chest",
+   "target": "pectorals",
+   "secondaryMuscles": [
+    "triceps",
+    "shoulders"
+   ],
+   "steps": [
+    "Place your hands on an elevated surface, such as a bench or step, slightly wider than shoulder-width apart.",
+    "Extend your legs behind you, resting on the balls of your feet, creating a straight line from your head to your heels.",
+    "Lower your chest towards the elevated surface by bending your elbows, keeping your body in a straight line.",
+    "Pause for a moment at the bottom, then push yourself back up to the starting position by straightening your arms.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "B1EVP9F"
+  },
+  "bench_press": {
+   "sourceId": "0025",
+   "sourceName": "barbell bench press",
+   "equipment": "barbell",
+   "bodyPart": "chest",
+   "target": "pectorals",
+   "secondaryMuscles": [
+    "triceps",
+    "shoulders"
+   ],
+   "steps": [
+    "Lie flat on a bench with your feet flat on the ground and your back pressed against the bench.",
+    "Grasp the barbell with an overhand grip slightly wider than shoulder-width apart.",
+    "Lift the barbell off the rack and hold it directly above your chest with your arms fully extended.",
+    "Lower the barbell slowly towards your chest, keeping your elbows tucked in.",
+    "Pause for a moment when the barbell touches your chest.",
+    "Push the barbell back up to the starting position by extending your arms.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "EIeI8Vf"
+  },
+  "pullups": {
+   "sourceId": "0652",
+   "sourceName": "pull-up",
+   "equipment": "body weight",
+   "bodyPart": "back",
+   "target": "lats",
+   "secondaryMuscles": [
+    "biceps",
+    "forearms"
+   ],
+   "steps": [
+    "Hang from a pull-up bar with your palms facing away from you and your arms fully extended.",
+    "Engage your core and squeeze your shoulder blades together.",
+    "Pull your body up towards the bar by bending your elbows and bringing your chest towards the bar.",
+    "Pause at the top of the movement, then slowly lower your body back down to the starting position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "lBDjFxJ"
+  },
+  "inverted_rows": {
+   "sourceId": "0499",
+   "sourceName": "inverted row",
+   "equipment": "body weight",
+   "bodyPart": "back",
+   "target": "upper back",
+   "secondaryMuscles": [
+    "biceps",
+    "forearms"
+   ],
+   "steps": [
+    "Set up a bar at waist height or use a suspension trainer.",
+    "Stand facing the bar or suspension trainer, with your feet shoulder-width apart.",
+    "Grab the bar or handles with an overhand grip, slightly wider than shoulder-width apart.",
+    "Lean back, keeping your body straight and your heels on the ground.",
+    "Pull your chest towards the bar or handles, squeezing your shoulder blades together.",
+    "Pause for a moment at the top, then slowly lower yourself back to the starting position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "bZGHsAZ"
+  },
+  "bicep_curls": {
+   "sourceId": "0294",
+   "sourceName": "dumbbell biceps curl",
+   "equipment": "dumbbell",
+   "bodyPart": "upper arms",
+   "target": "biceps",
+   "secondaryMuscles": [
+    "forearms"
+   ],
+   "steps": [
+    "Stand up straight with a dumbbell in each hand, palms facing forward and arms fully extended.",
+    "Keeping your upper arms stationary, exhale and curl the weights while contracting your biceps.",
+    "Continue to raise the weights until your biceps are fully contracted and the dumbbells are at shoulder level.",
+    "Hold the contracted position for a brief pause as you squeeze your biceps.",
+    "Inhale and slowly begin to lower the dumbbells back to the starting position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "NbVPDMW"
+  },
+  "lunges": {
+   "sourceId": "3470",
+   "sourceName": "forward lunge (male)",
+   "equipment": "body weight",
+   "bodyPart": "upper legs",
+   "target": "glutes",
+   "secondaryMuscles": [
+    "quadriceps",
+    "hamstrings",
+    "calves"
+   ],
+   "steps": [
+    "Stand with your feet hip-width apart and hands on your hips.",
+    "Take a big step forward with your right foot, lowering your body into a lunge position.",
+    "Bend your right knee to about 90 degrees, keeping your knee aligned with your ankle.",
+    "Push off with your right foot and return to the starting position.",
+    "Repeat with your left leg, alternating sides for the desired number of repetitions."
+   ],
+   "gymVisualMedia": "kMzUs9Y"
+  }
+ }
+}

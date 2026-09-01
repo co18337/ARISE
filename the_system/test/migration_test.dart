@@ -384,6 +384,32 @@ void main() {
     await upgraded.close();
   });
 
+  test('a renamed phase is migrated, not left to throw on read', () async {
+    // The crash this exists for: workout_sessions.phase is a textEnum, so the
+    // old names sat in the database as strings. The moment TrainingPhase.ignite
+    // stopped existing, reading any stored session threw "No enum value with
+    // that name" and TRAINING died outright. The column sweep cannot catch it —
+    // the column is there and typed correctly; the VALUE is what dangles.
+    final old = AppDatabase(NativeDatabase(dbFile));
+    final monday = DateTime(2026, 8, 31);
+    await WorkoutRepository(old, clock: FixedClock(monday)).openSession(monday);
+
+    await old.customStatement("UPDATE workout_sessions SET phase = 'ignite'");
+    await old.customStatement('PRAGMA user_version = 16');
+    await old.close();
+
+    final upgraded = AppDatabase(NativeDatabase(dbFile));
+    final session = await WorkoutRepository(
+      upgraded,
+      clock: FixedClock(monday),
+    ).openSession(monday);
+
+    expect(session, isNotNull);
+    // Week 1, so ignite maps to the phase GROUNDWORK was split out of.
+    expect(session!.phase, TrainingPhase.groundwork);
+    await upgraded.close();
+  });
+
   test('day numbers survive a round trip through the database', () {
     // Not a migration, but the same class of bug: every stored day is an
     // integer, and a day that decodes to a different date corrupts history

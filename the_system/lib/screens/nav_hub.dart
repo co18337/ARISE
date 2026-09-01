@@ -19,8 +19,8 @@ enum AppSection {
   memory('MEMORY', Icons.psychology_outlined),
   backup('BACKUP', Icons.save_alt),
 
-  /// DEV ONLY — remove with BadgeGalleryScreen once badge picks are settled.
-  badges('BADGES', Icons.military_tech_outlined);
+  /// The task catalog, editable. What makes "the plan is DATA" literally true.
+  plan('PLAN', Icons.edit_calendar_outlined);
 
   final String label;
   final IconData icon;
@@ -56,23 +56,65 @@ class NavHub extends StatelessWidget {
   /// shipped at nine destinations and sent TRAINING to STATUS.
   static const double _gap = 18;
 
-  /// Radius that keeps adjacent cells from overlapping.
+  /// A cell is TALLER than it is wide — a circular button with a label under
+  /// it. Fixed here so the geometry below is true by construction rather than
+  /// by assumption; the layout test measures it on a real screen size.
+  static const double _cellHeight = 106;
+
+  /// The smallest radius at which no two cells overlap.
   ///
-  /// The chord between two neighbours on a circle of radius r is
-  /// 2r·sin(pi/n), so the radius has to GROW with the number of destinations.
-  /// It was a constant 88 while there were four; at seven that put two
-  /// buttons on top of each other and taps landed on the wrong screen.
+  /// The old version compared the chord 2r·sin(pi/n) against the cell WIDTH
+  /// alone, and that is only half the problem. A cell is 86 wide but 106 tall,
+  /// so two neighbours separated mostly VERTICALLY can overlap on a chord that
+  /// clears them horizontally — which is exactly what happened at eleven
+  /// destinations: TRAINING sat on top of NUTRITION, and a Stack hit-tests the
+  /// last-painted child, so a tap on one opened the other.
+  ///
+  /// Solved rather than derived: two axis-aligned boxes miss each other when
+  /// |dx| >= width OR |dy| >= height, which has no clean closed form around a
+  /// circle. A binary search over the radius is exact, costs about twenty
+  /// iterations of a cheap check, and runs once per build of a menu that opens
+  /// a few times a day.
   static double _radiusFor(int count) {
     if (count < 2) return 0;
-    final needed = (_cell + _gap) / (2 * math.sin(math.pi / count));
-    return needed < 88 ? 88 : needed;
+    var low = 88.0;
+    var high = 900.0;
+    for (var i = 0; i < 24; i++) {
+      final mid = (low + high) / 2;
+      if (_cellsClear(mid, count)) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+    return high;
+  }
+
+  /// True when no two cells on a ring of [r] overlap.
+  static bool _cellsClear(double r, int n) {
+    final xs = <double>[];
+    final ys = <double>[];
+    for (var i = 0; i < n; i++) {
+      final angle = -math.pi / 2 + (2 * math.pi * i / n);
+      xs.add(r * math.cos(angle));
+      ys.add(r * math.sin(angle));
+    }
+    for (var i = 0; i < n; i++) {
+      for (var j = i + 1; j < n; j++) {
+        final dx = (xs[i] - xs[j]).abs();
+        final dy = (ys[i] - ys[j]).abs();
+        if (dx < _cell + _gap && dy < _cellHeight + _gap) return false;
+      }
+    }
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
     const sections = AppSection.values;
     final radius = _radiusFor(sections.length);
-    final boxSize = (radius * 2) + _cell + 16;
+    final boxWidth = (radius * 2) + _cell + 16;
+    final boxHeight = (radius * 2) + _cellHeight + 16;
 
     return HudOverlayScaffold(
       title: 'NAV',
@@ -89,8 +131,8 @@ class NavHub extends StatelessWidget {
               duration: const Duration(milliseconds: 420),
               curve: Curves.easeOutBack,
               builder: (context, t, _) => SizedBox(
-                width: boxSize,
-                height: boxSize,
+                width: boxWidth,
+                height: boxHeight,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -132,8 +174,10 @@ class NavHub extends StatelessWidget {
       child: Opacity(
         opacity: t.clamp(0.0, 1.0),
         child: SizedBox(
-          // Fixed cell width so a long label cannot spill into its neighbour.
+          // Fixed cell width AND height, so a long label cannot spill into a
+          // neighbour and the geometry above is measuring something real.
           width: _cell,
+          height: _cellHeight,
           child: HudCircleButton(
             icon: section.icon,
             label: section.label,

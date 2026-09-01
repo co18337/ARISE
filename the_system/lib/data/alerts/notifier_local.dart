@@ -130,7 +130,11 @@ class LocalNotifier implements Notifier {
       _lastError = null;
     } catch (error) {
       // Never fatal. A phone that will not take notifications is still a phone
-      // that runs the app.
+      // that runs the app — but this is NOT harmless, and it was invisible for
+      // a day: initialise() failing means schedule() returns early and Android
+      // holds no alarms at all, while the app looks perfectly healthy. The
+      // ALERTS screen surfaces this string for exactly that reason, and it is
+      // where to look first when nothing arrives.
       _lastError = '$error';
       debugPrint('[alerts] initialise failed: $error');
     }

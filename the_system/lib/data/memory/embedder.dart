@@ -15,6 +15,17 @@ abstract class Embedder {
 
   int get dimensions;
 
+  /// Settles anything [name] depends on, before it is read.
+  ///
+  /// The Gemini embedder resolves its model from the live list, so its name is
+  /// not final until that has happened. Without this the corpus could be
+  /// stamped 'gemini-auto-768' one moment and 'gemini-embedding-2-768' the
+  /// next — two labels for identical vectors, which makes every chunk look
+  /// permanently stale and re-embeds the whole corpus on every launch.
+  ///
+  /// A no-op for the local embedder, which knows what it is.
+  Future<void> prepare() async {}
+
   Future<List<Float32List>> embedAll(List<String> texts);
 }
 
@@ -51,6 +62,10 @@ class HashingEmbedder implements Embedder {
   /// were each cancelled by an unrelated collision. Four kilobytes per chunk
   /// is a price worth paying to make that vanishingly unlikely.
   const HashingEmbedder({this.dimensions = 1024});
+
+  /// Nothing to settle: it knows what it is and needs no network to say so.
+  @override
+  Future<void> prepare() async {}
 
   @override
   String get name => 'hashing-v1-$dimensions';

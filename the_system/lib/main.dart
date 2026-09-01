@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 
 import 'ai/ai_log_repository.dart';
 import 'ai/gemini_client.dart';
+import 'ai/groq_client.dart';
+import 'ai/llm_router.dart';
 import 'ai/lanes/nutrition_lane.dart';
+import 'ai/lanes/review_lane.dart';
 import 'ai/lanes/trainer_lane.dart';
 import 'config/app_config.dart';
 import 'data/db/database.dart';
@@ -12,12 +15,18 @@ import 'data/export/export_repository.dart';
 import 'data/repositories/activity_repository.dart';
 import 'data/repositories/player_repository.dart';
 import 'data/repositories/quest_repository.dart';
+import 'data/memory/embedder.dart';
+import 'data/memory/gemini.dart';
 import 'data/memory/memory_repository.dart';
 import 'data/memory/memory_trainer.dart';
 import 'data/repositories/nutrition_repository.dart';
 import 'data/alerts/notifier_factory.dart';
 import 'data/repositories/alert_repository.dart';
+import 'data/health/health_source_factory.dart';
+import 'data/repositories/health_repository.dart';
+import 'data/repositories/plan_repository.dart';
 import 'data/repositories/progress_repository.dart';
+import 'data/repositories/review_repository.dart';
 import 'data/repositories/workout_repository.dart';
 import 'screens/app_shell.dart';
 import 'theme/theme.dart';
@@ -42,13 +51,36 @@ Future<void> main() async {
     final database = AppDatabase();
     // One memory store, shared: the trainer reads from it and finished
     // sessions write to it, which is the loop that fills it.
-    final memory = MemoryRepository(database);
+    // The real embedder when there is a key, the local one otherwise.
+    //
+    // RETRIEVAL IS THE FLOOR AND ALWAYS WORKS: HashingEmbedder needs no
+    // network and no key, so recall functions offline. The key only changes
+    // how good the matching is — hashed word overlap versus actual meaning.
+    //
+    // Switching does NOT convert the corpus on its own. Vectors from two
+    // embedders are not comparable, so the store keeps both labelled and the
+    // MEMORY screen offers the upgrade explicitly — a silent re-embed on
+    // launch would spend a few hundred API calls without being asked.
+    final memory = MemoryRepository(
+      database,
+      embedder: AppConfig.hasGeminiKey
+          ? GeminiEmbedder()
+          : const HashingEmbedder(),
+    );
     // One client, shared by every lane. The nutrition lane is only attached
     // when a key exists — without one the app logs food and takes the figures
     // by hand, which is the whole offline path.
-    final gemini = GeminiClient(database);
-    final nutritionLane = AppConfig.hasGeminiKey ? NutritionLane(gemini) : null;
-    final trainerLane = AppConfig.hasGeminiKey ? TrainerLane(gemini) : null;
+    // Groq first because it is markedly faster; Gemini behind it as the
+    // deeper well. The router skips a provider with no key, so the app works
+    // with either, both, or neither — and the cache sits above both, so an
+    // answer is never bought twice.
+    final llm = LlmRouter(
+      db: database,
+      providers: [GroqClient(), GeminiClient(database)],
+    );
+    final hasLlm = llm.hasAnyProvider;
+    final nutritionLane = hasLlm ? NutritionLane(llm) : null;
+    final trainerLane = hasLlm ? TrainerLane(llm) : null;
     runApp(
       MyApp(
         questRepository: QuestRepository(database),
@@ -74,6 +106,20 @@ Future<void> main() async {
         alertRepository: AlertRepository(
           quests: QuestRepository(database),
           notifier: createNotifier(),
+        ),
+        // Read-only and one-way. The compiler picks the no-op on web, so
+        // nothing here can fail the launch.
+        healthRepository: HealthRepository(
+          db: database,
+          source: createHealthSource(),
+          quests: QuestRepository(database),
+        ),
+        planRepository: PlanRepository(database),
+        reviewRepository: ReviewRepository(
+          db: database,
+          progress: ProgressRepository(database),
+          memory: memory,
+          lane: hasLlm ? ReviewLane(llm) : null,
         ),
       ),
     );
@@ -116,6 +162,9 @@ class MyApp extends StatefulWidget {
   final NutritionRepository nutritionRepository;
   final ProgressRepository progressRepository;
   final AlertRepository alertRepository;
+  final HealthRepository healthRepository;
+  final PlanRepository planRepository;
+  final ReviewRepository reviewRepository;
 
   /// Starting look. Tests pin it; the real app loads the saved one instead.
   final AppThemeMode? initialThemeMode;
@@ -132,6 +181,9 @@ class MyApp extends StatefulWidget {
     required this.nutritionRepository,
     required this.progressRepository,
     required this.alertRepository,
+    required this.healthRepository,
+    required this.planRepository,
+    required this.reviewRepository,
     this.initialThemeMode,
   });
 
@@ -222,6 +274,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         nutritionRepository: widget.nutritionRepository,
         progressRepository: widget.progressRepository,
         alertRepository: widget.alertRepository,
+        healthRepository: widget.healthRepository,
+        planRepository: widget.planRepository,
+        reviewRepository: widget.reviewRepository,
         themeMode: _mode,
         onThemeModeChanged: _setMode,
       ),

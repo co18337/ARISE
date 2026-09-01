@@ -16,6 +16,10 @@ class WorkoutSetView {
   final int? actual;
   final bool done;
 
+  /// Weight in half-kilos: suggested when the set is issued, corrected to
+  /// whatever you actually loaded. Null for a movement that carries none.
+  final int? loadHalfKg;
+
   /// Beyond the prescription — logged and rewarded, but never counted toward
   /// progressive overload.
   final bool isExtra;
@@ -27,6 +31,7 @@ class WorkoutSetView {
     required this.actual,
     required this.done,
     this.isExtra = false,
+    this.loadHalfKg,
   });
 
   /// Did more than was asked for.
@@ -206,6 +211,8 @@ class WorkoutRepository {
       // emphasis comes from the last body scan's segment ratings.
       sessionsCompleted: await completedSessionCount(),
       emphasis: await readEmphasis(),
+      records: await recordByExercise(before: key),
+      deload: await deloadFor(date),
     );
 
     if (plan.isRestDay) return null;
@@ -235,6 +242,9 @@ class WorkoutRepository {
                 orderIndex: order,
                 setIndex: setIndex,
                 target: item.target,
+                // The suggestion travels with the set, so the card can show
+                // what to load before you touch anything.
+                loadHalfKg: Value(item.loadHalfKg),
               ),
             );
           }
@@ -304,6 +314,8 @@ class WorkoutRepository {
         clearedByExercise: await clearedByExercise(before: key),
         sessionsCompleted: await completedSessionCount(),
         emphasis: await readEmphasis(),
+        records: await recordByExercise(before: key),
+        deload: await deloadFor(date),
       );
       notes = plan.notes;
       source = plan.noteSource;
@@ -324,6 +336,143 @@ class WorkoutRepository {
     return _readSession(key);
   }
 
+  /// What the record says about every movement, for the progression rules.
+  ///
+  /// One pass over the set history rather than a query per exercise. Three
+  /// things come out of it and each answers a different question: how many
+  /// sessions were finished (may the prescription grow), what was last
+  /// actually lifted (from what weight), and how far past the ask the recent
+  /// sets landed (is the step the right size).
+  ///
+  /// EXTRA SETS ARE EXCLUDED throughout. Doing six sets where three were asked
+  /// is not the prescription completed twice, and letting it count that way is
+  /// how enthusiasm turns into an injury.
+  Future<Map<String, ExerciseRecord>> recordByExercise({
+    required int before,
+  }) async {
+    final rows = await (db.select(db.workoutSets).join([
+      innerJoin(
+        db.workoutSessions,
+        db.workoutSessions.id.equalsExp(db.workoutSets.sessionId),
+      ),
+    ])..where(
+        db.workoutSessions.day.isSmallerThanValue(before) &
+            db.workoutSets.isExtra.equals(false),
+      ))
+        .get();
+
+    final cleared = <String, int>{};
+    final lastLoad = <String, int?>{};
+    final lastDay = <String, int>{};
+    final recent = <String, List<({int target, int? actual})>>{};
+    final best = <String, int>{};
+
+    for (final row in rows) {
+      final set = row.readTable(db.workoutSets);
+      final day = row.readTable(db.workoutSessions).day;
+      if (!set.done) continue;
+
+      cleared[set.exerciseId] = (cleared[set.exerciseId] ?? 0) + 1;
+      final done = set.actual;
+      if (done != null && done > (best[set.exerciseId] ?? 0)) {
+        best[set.exerciseId] = done;
+      }
+      recent
+          .putIfAbsent(set.exerciseId, () => [])
+          .add((target: set.target, actual: set.actual));
+
+      // The most RECENT weight, not the heaviest — a single heroic day should
+      // not become the number every future session starts from.
+      if (set.loadHalfKg != null &&
+          day >= (lastDay[set.exerciseId] ?? -1 << 30)) {
+        lastDay[set.exerciseId] = day;
+        lastLoad[set.exerciseId] = set.loadHalfKg;
+      }
+    }
+
+    return {
+      for (final id in cleared.keys)
+        id: ExerciseRecord(
+          // Sets cleared, divided by the sets a session asks for — so the
+          // count means SESSIONS, which is what progression is measured in.
+          cleared: cleared[id]!,
+          lastLoadHalfKg: lastLoad[id],
+          // Only the last handful: a margin averaged over three months is a
+          // description of who you used to be.
+          margin: marginOf(recent[id]!.reversed.take(6)),
+          bestActual: best[id],
+        ),
+    };
+  }
+
+  /// The deload in force this week, or null for a normal week.
+  ///
+  /// Decided ONCE and then recorded: a deload has to last the week rather
+  /// than flickering as sessions are ticked off. Re-reading it later returns
+  /// the same answer even if the history that triggered it changes, because
+  /// you either had that week or you did not.
+  Future<Deload?> deloadFor(DateTime date, {DeloadRule rule = const DeloadRule()}) async {
+    final key = dayKeyOf(date);
+    final monday = key - (date.weekday - DateTime.monday);
+
+    final existing = await (db.select(db.deloads)
+          ..where((d) => d.startDay.equals(monday)))
+        .getSingleOrNull();
+    if (existing != null) {
+      return Deload(
+        DeloadReason.values.firstWhere(
+          (r) => r.name == existing.reason,
+          orElse: () => DeloadReason.planned,
+        ),
+      );
+    }
+
+    final startDay = await _programmeStartDay(key);
+    final week = programmeWeek(startDay: startDay, day: key);
+
+    final previous = await (db.select(db.deloads)
+          ..orderBy([(d) => OrderingTerm.desc(d.startDay)])
+          ..limit(1))
+        .getSingleOrNull();
+
+    final decided = rule.forWeek(
+      week: week,
+      recentUnfinished: await _recentUnfinished(before: monday),
+      weeksSinceLastDeload: previous == null
+          ? null
+          : ((monday - previous.startDay) / 7).floor(),
+    );
+    if (decided == null) return null;
+
+    await db.into(db.deloads).insertOnConflictUpdate(
+      DeloadsCompanion.insert(
+        startDay: Value(monday),
+        reason: decided.reason.name,
+        decidedAt: clock.now(),
+      ),
+    );
+    return decided;
+  }
+
+  /// Sessions from most recent backwards that were issued and left unfinished.
+  ///
+  /// Stops at the first COMPLETED one: the question is how many in a row, and
+  /// a bad Tuesday three weeks ago is not part of this week's run.
+  Future<int> _recentUnfinished({required int before}) async {
+    final sessions = await (db.select(db.workoutSessions)
+          ..where((s) => s.day.isSmallerThanValue(before))
+          ..orderBy([(s) => OrderingTerm.desc(s.day)])
+          ..limit(6))
+        .get();
+
+    var run = 0;
+    for (final session in sessions) {
+      if (session.completedAt != null) break;
+      run++;
+    }
+    return run;
+  }
+
   /// Where the programme stands: the phase earned, and what the next one
   /// still needs.
   ///
@@ -335,6 +484,7 @@ class WorkoutRepository {
     return PhaseGate.resolve(
       week: programmeWeek(startDay: await _programmeStartDay(key), day: key),
       sessionsCompleted: await completedSessionCount(),
+      records: await recordByExercise(before: key),
     );
   }
 
@@ -407,7 +557,15 @@ class WorkoutRepository {
 
   /// Ticks or un-ticks one set. [actual] defaults to the target, because the
   /// overwhelmingly common case is doing exactly what was asked.
-  Future<void> setDone(int setId, bool done, {int? actual}) async {
+  Future<void> setDone(
+    int setId,
+    bool done, {
+    int? actual,
+
+    /// What was actually on the bar, in half-kilos. Null leaves whatever is
+    /// already recorded — usually the suggestion — untouched.
+    int? loadHalfKg,
+  }) async {
     final row = await (db.select(db.workoutSets)
           ..where((s) => s.id.equals(setId)))
         .getSingle();
@@ -416,10 +574,22 @@ class WorkoutRepository {
       WorkoutSetsCompanion(
         done: Value(done),
         actual: Value(done ? (actual ?? row.target) : null),
+        // The weight SURVIVES un-ticking a set. Unticking says "I had not
+        // done this yet", not "I was never going to use that weight", and
+        // losing it would mean re-entering it every time.
+        loadHalfKg: loadHalfKg == null
+            ? const Value.absent()
+            : Value(loadHalfKg),
         completedAt: Value(done ? clock.now() : null),
       ),
     );
   }
+
+  /// Records the weight on a set without changing whether it is done.
+  Future<void> setLoad(int setId, int? loadHalfKg) =>
+      (db.update(db.workoutSets)..where((s) => s.id.equals(setId))).write(
+        WorkoutSetsCompanion(loadHalfKg: Value(loadHalfKg)),
+      );
 
   /// Marks the session finished, and remembers it.
   Future<void> completeSession(int sessionId) async {
@@ -566,6 +736,7 @@ class WorkoutRepository {
                     target: s.target,
                     actual: s.actual,
                     done: s.done,
+                    loadHalfKg: s.loadHalfKg,
                     isExtra: s.isExtra,
                   ),
               ],

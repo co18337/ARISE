@@ -408,9 +408,13 @@ void main() {
       AppConfig.overrideForTest(apiKey: null);
       expect(AppConfig.hasGeminiKey, isFalse);
       expect(AppConfig.geminiApiKey, isEmpty);
-      // The defaults still resolve, so nothing downstream needs a null check.
-      expect(AppConfig.geminiModel, isNotEmpty);
-      expect(AppConfig.geminiEmbeddingModel, isNotEmpty);
+      // Model names are RESOLVED from the live list, never defaulted. Empty
+      // means "ask the API", and it has to: this defaulted to
+      // text-embedding-004, which does not exist on the real key — the third
+      // pinned model name in this codebase to be wrong.
+      expect(AppConfig.geminiEmbeddingModel, isEmpty);
+      // The display value still reads sensibly with nothing pinned.
+      expect(AppConfig.geminiModel, 'auto');
     });
 
     test('reports a key once one is supplied', () {

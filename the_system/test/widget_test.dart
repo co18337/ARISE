@@ -10,7 +10,11 @@ import 'package:the_system/data/memory/memory_repository.dart';
 import 'package:the_system/data/repositories/nutrition_repository.dart';
 import 'package:the_system/data/alerts/notifier.dart';
 import 'package:the_system/data/repositories/alert_repository.dart';
+import 'package:the_system/data/health/health_source.dart';
+import 'package:the_system/data/repositories/health_repository.dart';
+import 'package:the_system/data/repositories/plan_repository.dart';
 import 'package:the_system/data/repositories/progress_repository.dart';
+import 'package:the_system/data/repositories/review_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
 import 'package:the_system/data/repositories/workout_repository.dart';
 import 'package:the_system/game/game.dart';
@@ -49,6 +53,17 @@ void main() {
       aiLogRepository: AiLogRepository(db),
       nutritionRepository: NutritionRepository(db, clock: clock),
       progressRepository: ProgressRepository(db),
+      planRepository: PlanRepository(db),
+      reviewRepository: ReviewRepository(
+        db: db,
+        progress: ProgressRepository(db),
+        memory: MemoryRepository(db),
+      ),
+      healthRepository: HealthRepository(
+        db: db,
+        source: NoopHealthSource(),
+        quests: QuestRepository(db),
+      ),
       alertRepository: AlertRepository(
         quests: QuestRepository(db),
         notifier: NoopNotifier(),
@@ -275,6 +290,17 @@ void main() {
       aiLogRepository: AiLogRepository(db),
       nutritionRepository: NutritionRepository(db, clock: clock),
       progressRepository: ProgressRepository(db),
+      planRepository: PlanRepository(db),
+      reviewRepository: ReviewRepository(
+        db: db,
+        progress: ProgressRepository(db),
+        memory: MemoryRepository(db),
+      ),
+      healthRepository: HealthRepository(
+        db: db,
+        source: NoopHealthSource(),
+        quests: QuestRepository(db),
+      ),
       alertRepository: AlertRepository(
         quests: QuestRepository(db),
         notifier: NoopNotifier(),

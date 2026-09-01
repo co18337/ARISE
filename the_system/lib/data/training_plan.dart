@@ -1,4 +1,7 @@
 import '../game/body_emphasis.dart';
+import '../game/deload.dart';
+import '../game/progression.dart';
+import 'progression_ladders.dart';
 import '../game/training.dart';
 import '../models/models.dart';
 import 'exercise_catalog.dart';
@@ -258,6 +261,8 @@ class RuleBasedTrainer implements TrainerAdvisor {
     required Map<String, int> clearedByExercise,
     int sessionsCompleted = 0,
     BodyEmphasis emphasis = BodyEmphasis.none,
+    Map<String, ExerciseRecord> records = const {},
+    Deload? deload,
   }) async {
     // The phase is what has been EARNED, not what the calendar allows. Week 5
     // arriving is not the same as being ready for week 5, and for somebody
@@ -269,7 +274,18 @@ class RuleBasedTrainer implements TrainerAdvisor {
     final phase = gate.reached;
 
     final template = TrainingPlan.templateFor(phase, weekday);
-    final exercises = TrainingPlan.exercisesFor(phase, weekday);
+
+    // The ladder decides WHICH movement, before the prescription decides how
+    // much of it. A template asking for pull-ups on somebody who cannot hang
+    // for twenty seconds gets dead hangs instead — and keeps getting them
+    // until hanging is easy.
+    final exercises = [
+      for (final exercise in TrainingPlan.exercisesFor(phase, weekday))
+        ExerciseCatalog.byId(
+              ProgressionLadders.resolve(exercise.id, records),
+            ) ??
+            exercise,
+    ];
 
     return SessionPlan(
       phase: phase,
@@ -280,6 +296,8 @@ class RuleBasedTrainer implements TrainerAdvisor {
           prescribeFor(
             exercise,
             clearedSessions: clearedByExercise[exercise.id] ?? 0,
+            record: records[exercise.id] ?? ExerciseRecord.none,
+            deload: deload,
             // The scan's weak segment earns one extra set on the movements
             // that load it — never on the warm-up or the cool-down, which are
             // not where volume belongs.
@@ -289,6 +307,7 @@ class RuleBasedTrainer implements TrainerAdvisor {
           ),
       ],
       gate: gate.isHeldBack ? gate : null,
+      deload: deload,
       emphasisReason: emphasis.hasPriority ? emphasis.reason : null,
     );
   }

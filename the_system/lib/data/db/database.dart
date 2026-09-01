@@ -35,6 +35,9 @@ part 'database.g.dart';
     BodyMeasurements,
     BodySegments,
     LabResults,
+    HealthDays,
+    WeeklyReviews,
+    Deloads,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -43,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -183,6 +186,58 @@ class AppDatabase extends _$AppDatabase {
         // unit: the scan, its five segments and the panel that was drawn the
         // same morning.
         await _seedHealthRecord();
+      }
+
+      if (from < 16) {
+        // Purely a new table. Nothing existing is touched, and an empty
+        // health_days simply means nothing has been synced yet — which is
+        // also true of a fresh install until permission is granted.
+        await m.createTable(healthDays);
+      }
+
+      if (from < 17) {
+        // RENAMING AN ENUM VALUE IS A DATA MIGRATION, and this one was missed.
+        // workout_sessions.phase is a textEnum, so the old names were sitting
+        // in the database as strings — and the moment TrainingPhase.ignite
+        // stopped existing, every attempt to read a stored session threw
+        // "No enum value with that name: ignite" and TRAINING died outright.
+        //
+        // The column sweep below cannot catch this: the column is present and
+        // its type is right; it is the VALUE that no longer resolves.
+        //
+        // ignite covered weeks 1-4, which GROUNDWORK and RESET were split out
+        // of, so it maps by week rather than to a single successor.
+        await customStatement(
+          "UPDATE workout_sessions SET phase = 'groundwork' "
+          "WHERE phase = 'ignite' AND week <= 2",
+        );
+        await customStatement(
+          "UPDATE workout_sessions SET phase = 'reset' WHERE phase = 'ignite'",
+        );
+        await customStatement(
+          "UPDATE workout_sessions SET phase = 'fatBurn' WHERE phase = 'reduce'",
+        );
+        await customStatement(
+          "UPDATE workout_sessions SET phase = 'buildSculpt' "
+          "WHERE phase = 'build'",
+        );
+        await customStatement(
+          "UPDATE workout_sessions SET phase = 'sharpen' WHERE phase = 'forge'",
+        );
+      }
+
+      if (from < 18) {
+        await m.createTable(weeklyReviews);
+      }
+
+      if (from < 19) {
+        // Purely additive and nullable: every set logged before this simply
+        // has no weight recorded, which is true — it was never asked for.
+        await _addColumnIfMissing(m, workoutSets, workoutSets.loadHalfKg);
+      }
+
+      if (from < 20) {
+        await m.createTable(deloads);
       }
 
       // A net beneath every step above, and the last thing to run.

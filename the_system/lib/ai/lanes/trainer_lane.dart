@@ -1,5 +1,5 @@
 import '../ai_result.dart';
-import '../gemini_client.dart';
+import '../llm_router.dart';
 
 /// One short note from the trainer, and what it was based on.
 class CoachNote {
@@ -24,7 +24,9 @@ class CoachNote {
 /// This is the generation half of RAG. The retrieval half already ran; these
 /// passages came out of the corpus, not out of the model's imagination.
 class TrainerLane {
-  final GeminiClient client;
+  /// The router, not a provider. The lane never learns which model answered —
+  /// that is the router's business and the AI log's.
+  final LlmRouter client;
 
   const TrainerLane(this.client);
 

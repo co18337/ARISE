@@ -12,12 +12,16 @@ import 'package:the_system/data/memory/memory_repository.dart';
 import 'package:the_system/data/repositories/nutrition_repository.dart';
 import 'package:the_system/data/alerts/notifier.dart';
 import 'package:the_system/data/repositories/alert_repository.dart';
+import 'package:the_system/data/health/health_source.dart';
+import 'package:the_system/data/repositories/health_repository.dart';
+import 'package:the_system/data/repositories/plan_repository.dart';
 import 'package:the_system/data/repositories/progress_repository.dart';
+import 'package:the_system/data/repositories/review_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
 import 'package:the_system/data/repositories/workout_repository.dart';
 import 'package:the_system/game/game.dart';
 import 'package:the_system/main.dart';
-import 'package:the_system/screens/badge_gallery_screen.dart';
+import 'package:the_system/screens/backup_screen.dart';
 import 'package:the_system/screens/nav_hub.dart';
 import 'package:the_system/widgets/system_panel.dart';
 import 'package:the_system/theme/theme.dart';
@@ -127,6 +131,17 @@ void main() {
       aiLogRepository: AiLogRepository(db),
       nutritionRepository: NutritionRepository(db, clock: FixedClock.todayAt(21, 30)),
       progressRepository: ProgressRepository(db),
+      planRepository: PlanRepository(db),
+      reviewRepository: ReviewRepository(
+        db: db,
+        progress: ProgressRepository(db),
+        memory: MemoryRepository(db),
+      ),
+      healthRepository: HealthRepository(
+        db: db,
+        source: NoopHealthSource(),
+        quests: QuestRepository(db),
+      ),
       alertRepository: AlertRepository(
         quests: QuestRepository(db),
         notifier: NoopNotifier(),
@@ -206,8 +221,14 @@ void main() {
       // The regression: MaterialApp's `home` is captured by the Navigator when
       // the first route is pushed, so rebuilding MaterialApp with a new theme
       // never reached the screens. Streaming screens corrected themselves on
-      // the next emission and looked fine; the badge gallery is entirely
-      // static and kept the old palette — a light panel on a dark app.
+      // the next emission and looked fine; a wholly static one kept the old
+      // palette — a light panel on a dark app.
+      //
+      // Driven through BACKUP, which has no StreamBuilder at all — a single
+      // Future that resolves once and never emits again. It replaced the badge
+      // gallery here when that dev screen left the hub, and it has to be a
+      // SHELL SECTION rather than a pushed route: a pushed route covers the
+      // shell bar, taking the theme toggle with it.
       tester.view.physicalSize = const Size(420 * 3, 1900 * 3);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(tester.view.reset);
@@ -219,10 +240,10 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Open navigation hub'));
       await settle(tester);
       await tester.tap(
-        find.descendant(of: find.byType(NavHub), matching: find.text('BADGES')),
+        find.descendant(of: find.byType(NavHub), matching: find.text('BACKUP')),
       );
       await settle(tester);
-      expect(find.byType(BadgeGalleryScreen), findsOneWidget);
+      expect(find.byType(BackupScreen), findsOneWidget);
 
       // The panel's own fill, which is the thing that stayed light.
       Color panelFill() {

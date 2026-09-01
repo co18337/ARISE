@@ -62,6 +62,9 @@ class AlertRepository {
         includeWake: false,
       ),
       ...planner.wakeAlarms(from: today, clock: clock),
+      // Booked a month out, like the wake alarm: it needs no day's quests to
+      // exist, so it survives the app not being opened.
+      ...planner.reviewReminders(from: today, clock: clock),
     ]..sort((a, b) => a.at.compareTo(b.at));
   }
 

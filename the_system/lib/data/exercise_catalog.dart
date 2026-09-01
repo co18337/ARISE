@@ -237,6 +237,7 @@ class ExerciseCatalog {
       cue: 'Start with the empty bar and learn the groove. Shoulder blades '
           'pulled back and down into the bench. Always use a rack or a '
           'spotter.',
+      loadStepHalfKg: 10,
       startSets: 3,
       startTarget: 8,
       step: 1,
@@ -253,6 +254,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Press without leaning back. Ribs down. Light dumbbells until the '
           'path is straight overhead.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 8,
       step: 1,
@@ -269,6 +271,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Light. Lead with the elbows to shoulder height, no higher. This '
           'one is never heavy — shoulder width is built with reps.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 10,
       step: 2,
@@ -284,6 +287,7 @@ class ExerciseCatalog {
       stat: StatType.str,
       unit: LoadUnit.reps,
       cue: 'Elbows pinned to your sides. Only the forearms move.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 10,
       step: 2,
@@ -300,6 +304,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Machine assistance high to begin with. Lean slightly forward, go '
           'to about 90° at the elbow — no deeper while it is new.',
+      loadStepHalfKg: 10,
       startSets: 3,
       startTarget: 6,
       step: 1,
@@ -318,6 +323,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Bar to your collarbone, chest up. Pull with your back, not your '
           'arms — think elbows into your back pockets.',
+      loadStepHalfKg: 10,
       startSets: 3,
       startTarget: 10,
       step: 1,
@@ -334,6 +340,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'The machine takes weight off you. Reduce the assistance as it gets '
           'easy — that number falling is the progress, not the reps.',
+      loadStepHalfKg: 10,
       startSets: 4,
       startTarget: 5,
       step: 1,
@@ -350,6 +357,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Sit tall, do not rock. Squeeze the shoulder blades together at the '
           'end of each pull and hold for a beat.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 10,
       step: 1,
@@ -366,6 +374,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Rope to your forehead, elbows high. This is the posture exercise — '
           'it is the direct answer to leaning shoulders.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 12,
       step: 2,
@@ -381,6 +390,7 @@ class ExerciseCatalog {
       stat: StatType.str,
       unit: LoadUnit.reps,
       cue: 'Elbows still, no swinging the weight up with your back.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 10,
       step: 2,
@@ -399,6 +409,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Dumbbell held at your chest. Sit down between your knees, heels '
           'flat. The weight at the front is what keeps your chest up.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 10,
       step: 2,
@@ -415,6 +426,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Do not let your lower back round off the pad at the bottom. Stop '
           'short of locking the knees at the top.',
+      loadStepHalfKg: 10,
       startSets: 3,
       startTarget: 10,
       step: 1,
@@ -432,6 +444,7 @@ class ExerciseCatalog {
       cue: 'Push your hips BACK, not down. Bar close to your legs, back flat. '
           'Stop when you feel the hamstrings, not when you reach the floor. '
           'Light until the hinge is automatic.',
+      loadStepHalfKg: 10,
       startSets: 3,
       startTarget: 8,
       step: 1,
@@ -449,6 +462,7 @@ class ExerciseCatalog {
       cue: 'Shoulders on the bench, drive through your heels, squeeze at the '
           'top and hold a beat. Ribs down — do not arch your back to get '
           'higher.',
+      loadStepHalfKg: 10,
       startSets: 3,
       startTarget: 10,
       step: 2,
@@ -464,6 +478,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Count each leg. Long step, back knee toward the floor, torso '
           'upright.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 8,
       step: 2,
@@ -479,6 +494,7 @@ class ExerciseCatalog {
       stat: StatType.str,
       unit: LoadUnit.reps,
       cue: 'Slow on the way back out. Hamstring work is also sprint insurance.',
+      loadStepHalfKg: 10,
       startSets: 3,
       startTarget: 10,
       step: 2,
@@ -494,6 +510,7 @@ class ExerciseCatalog {
       stat: StatType.str,
       unit: LoadUnit.reps,
       cue: 'Full range — all the way down, all the way up, pause at the top.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 12,
       step: 3,
@@ -559,6 +576,7 @@ class ExerciseCatalog {
       unit: LoadUnit.reps,
       cue: 'Each side. Rotate from the ribs, hips fairly still, arms just '
           'holding on.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 10,
       step: 2,
@@ -575,6 +593,7 @@ class ExerciseCatalog {
       unit: LoadUnit.seconds,
       cue: 'Heavy dumbbell in each hand, walk tall. Shoulders back, do not '
           'lean. The most honest trunk exercise there is.',
+      loadStepHalfKg: 5,
       startSets: 3,
       startTarget: 30,
       step: 10,

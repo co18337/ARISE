@@ -90,6 +90,7 @@ class _TrainingScreenState extends State<TrainingScreen>
     _standing = Future.wait([
       widget.workoutRepository.readGate(_today),
       widget.workoutRepository.readEmphasis(),
+      widget.workoutRepository.deloadFor(_today).then((d) => d ?? false),
     ]);
   }
 
@@ -167,12 +168,20 @@ class _TrainingScreenState extends State<TrainingScreen>
         // ceremony pointless.
         IgnorePointer(
           ignoring: !session.isSummoned,
-          child: AnimatedOpacity(
-            opacity: session.isSummoned ? 1 : 0.3,
-            duration: const Duration(milliseconds: 500),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: _sessionBody(session),
+          child: AnimatedSlide(
+            // Rises into place as it brightens. Before the summoning it sits
+            // low and dim behind the gate; accepting it lifts the whole
+            // session up from below, which is the moment the day arrives.
+            offset: session.isSummoned ? Offset.zero : const Offset(0, 0.06),
+            duration: const Duration(milliseconds: 620),
+            curve: Curves.easeOutCubic,
+            child: AnimatedOpacity(
+              opacity: session.isSummoned ? 1 : 0.3,
+              duration: const Duration(milliseconds: 500),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _sessionBody(session),
+              ),
             ),
           ),
         ),
@@ -190,7 +199,14 @@ class _TrainingScreenState extends State<TrainingScreen>
             if (data == null) return const SizedBox.shrink();
             final gate = data[0] as PhaseGate;
             final emphasis = data[1] as BodyEmphasis;
+            final deload = data[2] is Deload ? data[2] as Deload : null;
             final lines = [
+              // The back-off leads: it is the reason today looks lighter, and
+              // a shorter session with no explanation reads as the app losing
+              // your progress.
+              if (deload != null)
+                ('${deload.reason.label} WEEK · ${deload.reason.explanation}',
+                    true),
               if (gate.holdReason != null) (gate.holdReason!, true),
               if (emphasis.reason != null && emphasis.hasPriority)
                 (emphasis.reason!, false),
@@ -221,19 +237,32 @@ class _TrainingScreenState extends State<TrainingScreen>
           ),
         ],
         const SizedBox(height: 16),
+        // The movement you are on: the first with sets still to log. Once the
+        // session is done, nothing animates at all.
         for (final (i, exercise) in session.exercises.indexed) ...[
           HudEntrance(
             index: i + 1,
+            // Further than the default 14: these are the thing the summoning
+            // produces, so they should visibly arrive rather than settle.
+            offset: 34,
             child: _ExerciseCard(
               view: exercise,
+              animate: !session.isComplete &&
+                  i == session.exercises.indexWhere((e) => !e.complete),
               // Locked once the session is signed off. Leaving the chips live
               // let a finished session be un-ticked behind its own back, so it
               // read "complete" while its sets said otherwise.
               locked: session.isComplete,
               onToggleSet: (setId, done) =>
                   widget.workoutRepository.setDone(setId, done),
-              onLogAmount: (setId, amount) => widget.workoutRepository
-                  .setDone(setId, true, actual: amount),
+              onLogAmount: (setId, amount, loadHalfKg) => widget
+                  .workoutRepository
+                  .setDone(
+                    setId,
+                    true,
+                    actual: amount,
+                    loadHalfKg: loadHalfKg,
+                  ),
               onAddExtra: () => widget.workoutRepository
                   .addExtraSet(session.id, exercise.exercise.id),
               onRemoveExtra: widget.workoutRepository.removeExtraSet,
@@ -525,6 +554,10 @@ String _clockTime(DateTime at) =>
 class _ExerciseCard extends StatelessWidget {
   final WorkoutExerciseView view;
 
+  /// True for the ONE movement you are currently on. Only that card animates
+  /// its demonstration — see ExerciseDemo for why.
+  final bool animate;
+
   /// No more edits once the session is signed off.
   final bool locked;
 
@@ -532,7 +565,8 @@ class _ExerciseCard extends StatelessWidget {
 
   /// Logs a set at an amount other than the one prescribed. This is how
   /// "you said 20 minutes, I did 30" gets recorded as 30 rather than as 20.
-  final Future<void> Function(int setId, int amount) onLogAmount;
+  final Future<void> Function(int setId, int amount, int? loadHalfKg)
+      onLogAmount;
 
   /// Adds a set beyond the prescription. No cap — if there is more in you,
   /// the app's job is to record it, not to argue.
@@ -541,6 +575,7 @@ class _ExerciseCard extends StatelessWidget {
 
   const _ExerciseCard({
     required this.view,
+    required this.animate,
     required this.onToggleSet,
     required this.onLogAmount,
     required this.onAddExtra,
@@ -558,7 +593,13 @@ class _ExerciseCard extends StatelessWidget {
       text: (set.actual ?? set.target).toString(),
     );
 
-    final amount = await showDialog<int>(
+    // Only for movements that carry weight. Asking "how many kilos?" about a
+    // plank is how a form starts being ignored.
+    final loadController = TextEditingController(
+      text: set.loadHalfKg == null ? '' : _kg(set.loadHalfKg!),
+    );
+
+    final result = await showDialog<({int amount, int? loadHalfKg})>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
@@ -586,10 +627,31 @@ class _ExerciseCard extends StatelessWidget {
                 border: const OutlineInputBorder(),
               ),
             ),
+            if (exercise.isLoaded) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: loadController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Weight',
+                  suffixText: 'kg',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Text(
-              'More than asked for is fine — it is recorded and it earns XP. '
-              'It will not make next week harder on its own.',
+              exercise.isLoaded
+                  ? 'The weight is what the next session starts from, so log '
+                        'what was actually on the bar. More reps than asked '
+                        'for is fine and earns XP.'
+                  : 'More than asked for is fine — it is recorded and it earns '
+                        'XP. It will not make next week harder on its own.',
               style: AppTextStyles.body.copyWith(fontSize: 11),
             ),
           ],
@@ -600,8 +662,14 @@ class _ExerciseCard extends StatelessWidget {
             child: Text('CANCEL', style: AppTextStyles.hudLabel),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context)
-                .pop(int.tryParse(controller.text.trim()) ?? set.target),
+            onPressed: () => Navigator.of(context).pop((
+              amount: int.tryParse(controller.text.trim()) ?? set.target,
+              // Half-kilos, so 27.5 stays 27.5 rather than drifting into
+              // 27.500000000000004 the third time it is read back.
+              loadHalfKg: exercise.isLoaded
+                  ? _halfKg(loadController.text.trim())
+                  : null,
+            )),
             child: Text(
               'LOG IT',
               style:
@@ -613,7 +681,21 @@ class _ExerciseCard extends StatelessWidget {
     );
 
     controller.dispose();
-    if (amount != null && amount > 0) await onLogAmount(set.id, amount);
+    loadController.dispose();
+    if (result != null && result.amount > 0) {
+      await onLogAmount(set.id, result.amount, result.loadHalfKg);
+    }
+  }
+
+  static String _kg(int halfKg) {
+    final kg = halfKg / 2;
+    return kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : '$kg';
+  }
+
+  static int? _halfKg(String text) {
+    final kg = double.tryParse(text);
+    if (kg == null || kg <= 0) return null;
+    return (kg * 2).round();
   }
 
   @override
@@ -645,7 +727,14 @@ class _ExerciseCard extends StatelessWidget {
                 // not what you want to be doing then.
                 GestureDetector(
                   onTap: () => ExerciseGuideSheet.show(context, exercise),
-                  child: ExerciseDemo(exercise: exercise, size: 78),
+                  // Only the movement you are actually on animates. Every
+                  // other card falls back to its cue — see ExerciseDemo for
+                  // the battery measurement behind that.
+                  child: ExerciseDemo(
+                    exercise: exercise,
+                    size: 78,
+                    animate: animate,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

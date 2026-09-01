@@ -94,6 +94,19 @@ class _MemoryScreenState extends State<MemoryScreen> {
     return 'Seeded $written sample documents.';
   });
 
+  /// Converts the corpus to the current embedder.
+  ///
+  /// Explicit, never automatic. Vectors from two embedders are not comparable,
+  /// so a switch means re-embedding every chunk — a few hundred API calls that
+  /// nobody should spend on your behalf just because the app started.
+  Future<void> _reembed() => _run(() async {
+    final converted = await widget.memoryRepository.reembedAll();
+    return converted == 0
+        ? 'Already up to date — nothing to convert.'
+        : 'Converted $converted chunks. Recall now matches on meaning rather '
+              'than on shared words.';
+  });
+
   Future<void> _clearSamples() => _run(() async {
     final removed = await widget.memoryRepository.clear(
       externalIdPrefix: MemorySeeder.prefix,
@@ -177,9 +190,21 @@ class _MemoryScreenState extends State<MemoryScreen> {
             onPressed: _busy ? null : _seed,
           ),
         ),
+        if (_stats.staleChunks > 0) ...[
+          const SizedBox(height: 10),
+          HudEntrance(
+            index: 3,
+            child: GradientButton(
+              label: 'Convert ${_stats.staleChunks} chunks',
+              icon: Icons.upgrade,
+              colors: [AppColors.accentGold, AppColors.primary],
+              onPressed: _busy ? null : _reembed,
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         HudEntrance(
-          index: 3,
+          index: 4,
           child: GradientButton(
             label: 'Clear sample data',
             icon: Icons.delete_outline,
@@ -322,6 +347,12 @@ class _CorpusPanel extends StatelessWidget {
           if ((stats.byKind[kind] ?? 0) > 0)
             StatRow(kind.label, '${stats.byKind[kind]}'),
         StatRow('Embedder', stats.embedder),
+        if (stats.staleChunks > 0)
+          StatRow(
+            'Not yet converted',
+            '${stats.staleChunks}',
+            valueColor: AppColors.accentGold,
+          ),
         StatRow('Dimensions', '${stats.dimensions}'),
         if (stats.staleChunks > 0)
           StatRow(

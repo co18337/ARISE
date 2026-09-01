@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:the_system/ai/ai_result.dart';
 import 'package:the_system/ai/gemini_client.dart';
+import 'package:the_system/ai/llm_router.dart';
 import 'package:the_system/config/app_config.dart';
 import 'package:the_system/data/db/database.dart';
 
@@ -178,7 +179,14 @@ void main() {
       return (client: client, calls: calls);
     }
 
-    Future<AiResult<Map<String, Object?>>> ask(GeminiClient gemini) =>
+    /// Through the ROUTER, which is where caching lives now. It was inside the
+    /// Gemini client until a second provider arrived; keyed there it could
+    /// never have shared an answer across providers, which is the whole point
+    /// of paying for one only once.
+    LlmRouter routerFor(http.Client client) =>
+        LlmRouter(db: db, providers: [GeminiClient(db, client: client)]);
+
+    Future<AiResult<Map<String, Object?>>> ask(LlmRouter gemini) =>
         gemini.completeJson(
           lane: 'trainer',
           systemPrompt: 'system',
@@ -188,7 +196,7 @@ void main() {
 
     test('the same question is not paid for twice', () async {
       final fake = fakeGemini();
-      final gemini = GeminiClient(db, client: fake.client);
+      final gemini = routerFor(fake.client);
 
       expect(await ask(gemini), isA<AiOk<Map<String, Object?>>>());
       final afterFirst = fake.calls.length;
@@ -206,7 +214,7 @@ void main() {
       // network — during US business hours, which is when 503s happen, the
       // cache effectively did not exist.
       final fake = fakeGemini(saturated: {'gemini-3.7-flash'});
-      final gemini = GeminiClient(db, client: fake.client);
+      final gemini = routerFor(fake.client);
 
       final first = await ask(gemini);
       expect(first, isA<AiOk<Map<String, Object?>>>());
@@ -225,7 +233,7 @@ void main() {
       // fault, do not shop around", so the next model — which has a quota of
       // its own, because the free tier counts per model — was never asked.
       final fake = fakeGemini(outOfQuota: {'gemini-3.7-flash'});
-      final gemini = GeminiClient(db, client: fake.client);
+      final gemini = routerFor(fake.client);
 
       final result = await ask(gemini);
 
@@ -245,7 +253,7 @@ void main() {
       // The distinction that makes the fix above safe: overload is temporary
       // and worth waiting a second for, quota is not.
       final fake = fakeGemini(saturated: {'gemini-3.7-flash'});
-      await ask(GeminiClient(db, client: fake.client));
+      await ask(routerFor(fake.client));
       expect(
         fake.calls.where((c) => c == 'gemini-3.7-flash').length,
         greaterThan(1),
@@ -259,12 +267,12 @@ void main() {
       // real round trip, against the key, to choose a model whose answer was
       // already on disk.
       final warm = fakeGemini();
-      await ask(GeminiClient(db, client: warm.client));
+      await ask(routerFor(warm.client));
       expect(warm.calls, contains('list'));
 
       // A second client on the same database is a second launch.
       final cold = fakeGemini();
-      final second = await ask(GeminiClient(db, client: cold.client));
+      final second = await ask(routerFor(cold.client));
 
       expect((second as AiOk).cached, isTrue);
       expect(cold.calls, isEmpty, reason: 'not even GET /models');

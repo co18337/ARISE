@@ -267,6 +267,17 @@ class WorkoutSets extends Table {
   IntColumn get target => integer()();
   IntColumn get actual => integer().nullable()();
 
+  /// Weight moved, in units of 0.5 kg — so 27.5 kg is 55.
+  ///
+  /// INTEGER HALF-KILOS rather than a real: gym plates come in halves and a
+  /// float would let 27.500000000000004 into the history, which then reads
+  /// back as a different working weight than the one before it.
+  ///
+  /// Null for anything not loaded — running, planks, push-ups. Progression for
+  /// those is reps or minutes, and a weight column full of nulls is the honest
+  /// way to say a movement has no weight rather than pretending it is zero.
+  IntColumn get loadHalfKg => integer().nullable()();
+
   BoolColumn get done => boolean().withDefault(const Constant(false))();
   DateTimeColumn get completedAt => dateTime().nullable()();
 
@@ -627,4 +638,93 @@ class LabResults extends Table {
   /// overwrite rather than accumulate.
   @override
   Set<Column> get primaryKey => {day, panel, name};
+}
+
+/// A day of health data, read from Health Connect.
+///
+/// One row per day, keyed by the day, exactly like the rollups — so a chart
+/// over three months is one indexed scan rather than a fold over thousands of
+/// individual samples. Health Connect stores raw samples; this stores the
+/// DAILY TOTALS the app actually draws, which is the only shape it ever asks
+/// for.
+///
+/// READ-ONLY AND ONE-WAY. The System reads from Health Connect and never
+/// writes back. Every column is nullable because a phone reports what it has:
+/// the step counter is always there, sleep only if something tracked it, and
+/// resting heart rate only if a watch was worn.
+///
+/// The app TOTALS and CHARTS these. It does not interpret them — no target
+/// heart rate, no sleep score, no "you are overtraining". That reading belongs
+/// to a doctor, and the same rule governs the body scans and the blood work.
+@DataClassName('HealthDayRow')
+class HealthDays extends Table {
+  IntColumn get day => integer()();
+
+  IntColumn get steps => integer().nullable()();
+
+  /// Total asleep time in minutes — not time in bed.
+  IntColumn get sleepMinutes => integer().nullable()();
+
+  /// Beats per minute. Resting is the one worth trending; a workout average
+  /// says more about the workout than about the body.
+  IntColumn get restingHeartRate => integer().nullable()();
+
+  IntColumn get activeKcal => integer().nullable()();
+
+  /// Metres, the unit Health Connect reports in. Converted for display only.
+  IntColumn get distanceM => integer().nullable()();
+
+  /// Minutes of recorded exercise. What auto-verifies the running quest.
+  IntColumn get workoutMinutes => integer().nullable()();
+
+  /// When this row was last refreshed, so a stale day can be re-synced.
+  DateTimeColumn get syncedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {day};
+}
+
+/// One week's review, written once and kept.
+///
+/// Keyed by the day the week ENDED (the Sunday), so re-opening the app on
+/// Monday reads Sunday's review rather than generating a second one. The whole
+/// point of the weekly call is that it happens once a week.
+@DataClassName('WeeklyReviewRow')
+class WeeklyReviews extends Table {
+  /// Day number of the Sunday this review covers.
+  IntColumn get weekEndDay => integer()();
+
+  TextColumn get summary => text()();
+  TextColumn get kept => text()();
+  TextColumn get change => text()();
+
+  /// 'model' when a provider wrote it, 'figures' when it was assembled from
+  /// the numbers alone. Shown, because they deserve different trust — the same
+  /// rule the trainer note follows.
+  TextColumn get source => text().withDefault(const Constant('figures'))();
+
+  DateTimeColumn get generatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {weekEndDay};
+}
+
+/// A week that was backed off.
+///
+/// Recorded rather than derived, because "when did I last deload" has to
+/// survive the history that produced it changing. Re-timing a template or
+/// correcting a logged set must not silently move a deload that already
+/// happened — you either had that week or you did not.
+@DataClassName('DeloadRow')
+class Deloads extends Table {
+  /// Day number of the Monday the deload week began.
+  IntColumn get startDay => integer()();
+
+  /// 'planned' or 'stalled'.
+  TextColumn get reason => text()();
+
+  DateTimeColumn get decidedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {startDay};
 }

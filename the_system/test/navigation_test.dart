@@ -11,7 +11,11 @@ import 'package:the_system/data/memory/memory_repository.dart';
 import 'package:the_system/data/repositories/nutrition_repository.dart';
 import 'package:the_system/data/alerts/notifier.dart';
 import 'package:the_system/data/repositories/alert_repository.dart';
+import 'package:the_system/data/health/health_source.dart';
+import 'package:the_system/data/repositories/health_repository.dart';
+import 'package:the_system/data/repositories/plan_repository.dart';
 import 'package:the_system/data/repositories/progress_repository.dart';
+import 'package:the_system/data/repositories/review_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
 import 'package:the_system/data/repositories/workout_repository.dart';
 import 'package:the_system/game/game.dart';
@@ -22,10 +26,12 @@ import 'package:the_system/screens/backup_screen.dart';
 import 'package:the_system/screens/badge_gallery_screen.dart';
 import 'package:the_system/screens/meal_plan_screen.dart';
 import 'package:the_system/screens/memory_screen.dart';
+import 'package:the_system/screens/blood_work_screen.dart';
 import 'package:the_system/screens/nutrition_screen.dart';
 import 'package:the_system/screens/progress_screen.dart';
 import 'package:the_system/screens/training_screen.dart';
 import 'package:the_system/screens/nav_hub.dart';
+import 'package:the_system/widgets/hud_circle_button.dart';
 import 'package:the_system/screens/status_screen.dart';
 import 'package:the_system/screens/today_screen.dart';
 import 'package:the_system/screens/weekly_report_screen.dart';
@@ -55,6 +61,17 @@ void main() {
       aiLogRepository: AiLogRepository(db),
       nutritionRepository: NutritionRepository(db, clock: clock),
       progressRepository: ProgressRepository(db),
+      planRepository: PlanRepository(db),
+      reviewRepository: ReviewRepository(
+        db: db,
+        progress: ProgressRepository(db),
+        memory: MemoryRepository(db),
+      ),
+      healthRepository: HealthRepository(
+        db: db,
+        source: NoopHealthSource(),
+        quests: QuestRepository(db),
+      ),
       alertRepository: AlertRepository(
         quests: QuestRepository(db),
         notifier: NoopNotifier(),
@@ -124,7 +141,7 @@ void main() {
       'LOG',
       'MEMORY',
       'BACKUP',
-      'BADGES',
+      'PLAN',
     ]) {
       expect(
         find.descendant(of: hub, matching: find.text(label)),
@@ -749,8 +766,13 @@ void main() {
     await scrollTo(find.text('WHERE THE XP WENT'));
     expect(find.byType(PieChart), findsOneWidget);
 
-    // The blood work is here too, with the report's own flags.
+    // Blood work is a LINK now, not a section: it is a medical record rather
+    // than a training signal, and it earned its own screen.
     await scrollTo(find.text('BLOOD WORK'));
+    await tester.tap(find.text('BLOOD WORK'));
+    await settle(tester);
+
+    expect(find.byType(BloodWorkScreen), findsOneWidget);
     expect(find.text('OUTSIDE THE REFERENCE RANGE'), findsOneWidget);
     expect(find.textContaining('SGPT'), findsWidgets);
 
@@ -775,7 +797,10 @@ void main() {
     await settle(tester);
     await navigateTo(tester, 'PROGRESS');
 
-    expect(find.byType(LineChart), findsOneWidget);
+    // Several now: every trended figure gets its own chart rather than three
+    // series sharing one axis, because kilograms and percent do not share a
+    // scale and a combined chart cannot be read.
+    expect(find.byType(LineChart), findsWidgets);
     expect(find.textContaining('starts at your next scan'), findsNothing);
     // Down 6.3 kg against the baseline, stated as a delta rather than left to
     // be worked out.
@@ -830,15 +855,89 @@ void main() {
     await disposeTree(tester);
   });
 
+  testWidgets('the hub stays tappable at the real screen size', (
+    WidgetTester tester,
+  ) async {
+    // Measured on the actual device rather than a comfortable test surface:
+    // a Motorola G34 is 720x1600 at density 280, so 411x914 LOGICAL dp.
+    //
+    // The ring's radius grows with the destination count, and a FittedBox
+    // scales the whole thing down when it outgrows the screen — which means
+    // adding destinations does not cause overlap, it quietly shrinks the
+    // buttons instead. That is the failure worth guarding: overlap is loud,
+    // a 40dp target is just annoying forever.
+    tester.view.physicalSize = const Size(720, 1600);
+    tester.view.devicePixelRatio = 1.75;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await tester.tap(find.bySemanticsLabel('Open navigation hub'));
+    await settle(tester);
+
+    // Every destination is on screen and none has been scaled into nothing.
+    final rects = <String, Rect>{};
+    for (final section in AppSection.values) {
+      final finder = find.descendant(
+        of: find.byType(NavHub),
+        matching: find.text(section.label),
+      );
+      expect(finder, findsOneWidget, reason: section.label);
+
+      final button = find
+          .ancestor(of: finder, matching: find.byType(HudCircleButton))
+          .first;
+      final rect = tester.getRect(button);
+      // getRect is in GLOBAL coordinates, so it already accounts for the
+      // FittedBox scale — which is the whole point of measuring here.
+      expect(
+        rect.width,
+        greaterThanOrEqualTo(48),
+        reason: '${section.label} is below the 48dp touch minimum',
+      );
+      expect(
+        tester.view.physicalSize.width / tester.view.devicePixelRatio,
+        greaterThanOrEqualTo(rect.right),
+        reason: '${section.label} is off the right edge',
+      );
+      rects[section.label] = rect;
+    }
+
+    // And no two overlap. A Stack hit-tests the LAST-PAINTED child, so two
+    // cells sharing a point send a tap to whichever was drawn later — which
+    // is exactly how TRAINING once opened STATUS.
+    final entries = rects.entries.toList();
+    for (var i = 0; i < entries.length; i++) {
+      for (var j = i + 1; j < entries.length; j++) {
+        expect(
+          entries[i].value.overlaps(entries[j].value),
+          isFalse,
+          reason: '${entries[i].key} overlaps ${entries[j].key}',
+        );
+      }
+    }
+
+    await disposeTree(tester);
+  });
+
   testWidgets('the badge gallery lists every usable badge', (
     WidgetTester tester,
   ) async {
     // A dev screen, but a tested one: it drives 33 image assets, and a typo in
     // a filename shows as a blank square with no error anywhere.
     useTallSurface(tester);
-    await tester.pumpWidget(buildApp());
+    // Pumped directly rather than reached through the hub: BADGES was a dev
+    // destination and gave up its slot when PLAN arrived. The screen still
+    // exists and still drives the artwork, which is what this guards.
+    await tester.pumpWidget(
+      // No explicit theme: this test is about the artwork loading, and the
+      // palette it loads under makes no difference to that.
+      // Wrapped in a Scaffold: the screen is a shell SECTION and has never
+      // carried one of its own, so its InkWells have no Material ancestor
+      // when it is pumped bare.
+      const MaterialApp(home: Scaffold(body: BadgeGalleryScreen())),
+    );
     await settle(tester);
-    await navigateTo(tester, 'BADGES');
 
     final gallery = find.byType(BadgeGalleryScreen);
     expect(gallery, findsOneWidget);
@@ -904,6 +1003,17 @@ void main() {
         aiLogRepository: AiLogRepository(db),
         nutritionRepository: NutritionRepository(db, clock: movable),
         progressRepository: ProgressRepository(db),
+        planRepository: PlanRepository(db),
+        reviewRepository: ReviewRepository(
+          db: db,
+          progress: ProgressRepository(db),
+          memory: MemoryRepository(db),
+        ),
+        healthRepository: HealthRepository(
+          db: db,
+          source: NoopHealthSource(),
+          quests: QuestRepository(db),
+        ),
         alertRepository: AlertRepository(
           quests: QuestRepository(db),
           notifier: NoopNotifier(),

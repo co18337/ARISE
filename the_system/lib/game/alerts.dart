@@ -206,6 +206,49 @@ class AlertPlanner {
     ];
   }
 
+  /// The Sunday review reminder, for the next [weeks] Sundays.
+  ///
+  /// Scheduled the same way as the wake alarm and for the same reason: it does
+  /// not depend on any day's quests existing, so it can be booked weeks ahead
+  /// and survives the app not being opened.
+  ///
+  /// The notification does not WRITE the review — nothing in this app can run
+  /// Dart from a notification, and a foreground service for one call a week
+  /// would cost a permanent icon in the tray. It brings you to the app, and
+  /// the app writes it on opening. Tapping it is the automatic path; ignoring
+  /// it until Monday still gets you Sunday's review.
+  List<ScheduledAlert> reviewReminders({
+    required DateTime from,
+    required Clock clock,
+    int weeks = 4,
+    int atMinutes = 20 * 60,
+  }) {
+    final now = clock.now();
+    final start = DateTime(from.year, from.month, from.day);
+    // Days until the coming Sunday; 0 when today is Sunday.
+    final untilSunday = DateTime.sunday - start.weekday;
+
+    return [
+      for (var w = 0; w < weeks; w++)
+        if (start
+            .add(Duration(days: untilSunday + w * 7, minutes: atMinutes))
+            .isAfter(now))
+          ScheduledAlert(
+            id: _idFor(
+              start.add(Duration(days: untilSunday + w * 7)),
+              'review',
+              3,
+            ),
+            kind: AlertKind.dayReview,
+            at: start.add(
+              Duration(days: untilSunday + w * 7, minutes: atMinutes),
+            ),
+            title: AlertKind.dayReview.title,
+            body: 'The week is done. Open the System for your review.',
+          ),
+    ];
+  }
+
   /// A stable id from the date, the step and the slot.
   ///
   /// Android notification ids are 32-bit signed, so this has to stay inside

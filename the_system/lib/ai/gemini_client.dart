@@ -9,6 +9,7 @@ import '../config/app_config.dart';
 import '../data/db/database.dart';
 import '../game/game.dart';
 import 'ai_result.dart';
+import 'llm_client.dart';
 
 /// The only thing in the app that talks to Gemini.
 ///
@@ -20,7 +21,30 @@ import 'ai_result.dart';
 /// NOT YET VERIFIED AGAINST THE LIVE SERVICE. Written from the published API
 /// with no key to test against. Every field is parsed explicitly, so the first
 /// real call fails with a readable message rather than a silent wrong answer.
-class GeminiClient {
+class GeminiClient implements LlmClient {
+  @override
+  String get name => 'gemini';
+
+  @override
+  bool get isConfigured => AppConfig.hasGeminiKey;
+
+  /// Gemini publishes no remaining-quota header, so exhaustion can only be
+  /// LEARNED from a 429 — unlike Groq, which reports it up front. Once learned
+  /// it is remembered for the day rather than rediscovered a request at a time.
+  DateTime? _exhaustedOn;
+
+  @override
+  bool get isExhausted {
+    final on = _exhaustedOn;
+    if (on == null) return false;
+    final now = clock.now();
+    if (now.year != on.year || now.month != on.month || now.day != on.day) {
+      _exhaustedOn = null;
+      return false;
+    }
+    return true;
+  }
+
   final AppDatabase db;
   final http.Client http_;
   final Clock clock;
@@ -191,6 +215,7 @@ class GeminiClient {
   /// fills it; anything that comes back in another shape is rejected as
   /// [AiBadResponse] rather than half-understood. Fishing numbers out of a
   /// paragraph with a regex is how a coaching note becomes a calorie count.
+  @override
   Future<AiResult<Map<String, Object?>>> completeJson({
     required String lane,
     required String systemPrompt,
@@ -202,7 +227,11 @@ class GeminiClient {
     // thinking and 367 answering, so an 800 cap truncated the JSON mid-string
     // and surfaced as an unusable-shape error rather than as "ran out of room".
     int maxOutputTokens = 4096,
-    bool useCache = true,
+    // OFF by default now. Caching moved up to LlmRouter, which keys on the
+    // prompt alone so an answer bought from Groq is never bought again from
+    // Gemini. Leaving it on here as well would write every answer twice and
+    // put a provider-local copy behind the shared one.
+    bool useCache = false,
   }) async {
     if (!AppConfig.hasGeminiKey) return const AiNoKey();
 
@@ -277,6 +306,14 @@ class GeminiClient {
     final ms = DateTime.now().difference(started).inMilliseconds;
 
     if (response.statusCode != 200) {
+      // Every model in the chain came back 429, so the allowance is spent
+      // across the whole key rather than on one model. Remember it for the
+      // day: the router will skip this provider entirely instead of
+      // rediscovering the same thing on the next lane's call.
+      if (response.statusCode == 429) {
+        _exhaustedOn = clock.now();
+        debugPrint('[ai] gemini quota spent for today');
+      }
       // The body carries Google's own explanation, which is the useful half.
       final detail = '${response.statusCode}: ${_trim(response.body)}';
       await _record(

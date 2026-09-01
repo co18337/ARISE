@@ -15,7 +15,28 @@ class ExerciseDemo extends StatefulWidget {
   final Exercise exercise;
   final double size;
 
-  const ExerciseDemo({super.key, required this.exercise, this.size = 96});
+  /// Whether the animation runs.
+  ///
+  /// FALSE FOR EVERY CARD BUT THE ONE IN FRONT OF YOU, and that is a battery
+  /// decision rather than an aesthetic one. Flutter animates a GIF for as long
+  /// as its Image is mounted — there is no pause, only mount or do not. Five
+  /// visible demonstrations at 25fps is 125 frame decodes a second for as long
+  /// as the screen is open, and it measured 16% of a Motorola G34's battery.
+  ///
+  /// The 25fps is mine: re-timing the source from 4fps so the movements read
+  /// as video multiplied that decode work sixfold. Right call for the look,
+  /// wrong one to apply to every card at once.
+  ///
+  /// A still card falls back to the written cue, which is what every card
+  /// showed before there was any artwork at all.
+  final bool animate;
+
+  const ExerciseDemo({
+    super.key,
+    required this.exercise,
+    this.size = 96,
+    this.animate = true,
+  });
 
   @override
   State<ExerciseDemo> createState() => _ExerciseDemoState();
@@ -59,7 +80,7 @@ class _ExerciseDemoState extends State<ExerciseDemo> {
       future: _resolving,
       builder: (context, snapshot) {
         final source = snapshot.data;
-        if (source is CachedDemo) {
+        if (source is CachedDemo && widget.animate) {
           // Null on web, where there is no file to show.
           final provider = fileImageProvider(source.filePath);
           if (provider != null) return _image(provider);

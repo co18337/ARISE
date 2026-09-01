@@ -8,6 +8,9 @@ import '../ai/ai_log_repository.dart';
 import '../data/memory/memory_repository.dart';
 import '../data/repositories/nutrition_repository.dart';
 import '../data/repositories/alert_repository.dart';
+import '../data/repositories/health_repository.dart';
+import '../data/repositories/plan_repository.dart';
+import '../data/repositories/review_repository.dart';
 import '../data/repositories/progress_repository.dart';
 import '../data/repositories/workout_repository.dart';
 import '../theme/theme.dart';
@@ -18,13 +21,13 @@ import '../widgets/rank_header.dart';
 import '../widgets/theme_toggle_button.dart';
 import 'activity_log_screen.dart';
 import 'backup_screen.dart';
-import 'badge_gallery_screen.dart';
 import 'nav_hub.dart';
 import 'reward_overlay.dart';
 import 'status_screen.dart';
 import 'memory_screen.dart';
 import 'alerts_screen.dart';
 import 'nutrition_screen.dart';
+import 'plan_screen.dart';
 import 'progress_screen.dart';
 import 'training_screen.dart';
 import 'today_screen.dart';
@@ -50,6 +53,9 @@ class AppShell extends StatefulWidget {
   final NutritionRepository nutritionRepository;
   final ProgressRepository progressRepository;
   final AlertRepository alertRepository;
+  final HealthRepository healthRepository;
+  final PlanRepository planRepository;
+  final ReviewRepository reviewRepository;
 
   /// The look currently in force, and the way to change it. Owned by MyApp,
   /// because switching theme rebuilds everything below it.
@@ -68,6 +74,9 @@ class AppShell extends StatefulWidget {
     required this.nutritionRepository,
     required this.progressRepository,
     required this.alertRepository,
+    required this.healthRepository,
+    required this.planRepository,
+    required this.reviewRepository,
     required this.themeMode,
     required this.onThemeModeChanged,
   });
@@ -153,26 +162,25 @@ class _AppShellState extends State<AppShell> {
       AppSection.progress => ProgressScreen(
         key: const ValueKey('progress'),
         progressRepository: widget.progressRepository,
+        healthRepository: widget.healthRepository,
       ),
       AppSection.weeklyReport => WeeklyReportScreen(
         key: const ValueKey('report'),
+        reviewRepository: widget.reviewRepository,
         playerRepository: widget.playerRepository,
       ),
       AppSection.activityLog => ActivityLogScreen(
         key: const ValueKey('log'),
         activityRepository: widget.activityRepository,
       ),
-      // DEV ONLY — see BadgeGalleryScreen.
-      // NOT const. A const widget is canonicalised, so every rebuild produces
-      // the identical instance and Element.updateChild short-circuits without
-      // rebuilding it. This is the only section that takes no repository and
-      // could therefore be const — which is exactly why it was the only screen
-      // that kept the old palette after a theme flip.
-      AppSection.badges => BadgeGalleryScreen(key: const ValueKey('badges')),
       AppSection.memory => MemoryScreen(
         key: const ValueKey('memory'),
         memoryRepository: widget.memoryRepository,
         aiLogRepository: widget.aiLogRepository,
+      ),
+      AppSection.plan => PlanScreen(
+        key: const ValueKey('plan'),
+        planRepository: widget.planRepository,
       ),
       AppSection.backup => BackupScreen(
         // Keyed by nothing else, so leaving and returning rebuilds the export

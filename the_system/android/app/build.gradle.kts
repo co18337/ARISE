@@ -24,7 +24,15 @@ android {
         applicationId = "com.example.the_system"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // 26, not Flutter's default 24. The health plugin requires it, and
+        // Health Connect does not exist below 26 anyway — so honouring 24
+        // would mean shipping a lower floor for a feature that could never
+        // work there. The override alternative was documented by Gradle as
+        // "may lead to runtime failures", which is worse than an honest floor.
+        //
+        // Cost: Android 7.x is dropped. The only device this app runs on is a
+        // Motorola G34 on Android 15.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)

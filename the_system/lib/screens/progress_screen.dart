@@ -1,16 +1,19 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../data/repositories/health_repository.dart';
 import '../data/repositories/progress_repository.dart';
 import '../game/game.dart';
 import '../models/models.dart';
 import '../theme/theme.dart';
+import '../widgets/gradient_button.dart';
 import '../widgets/hud_charts.dart';
 import '../widgets/hud_entrance.dart';
 import '../widgets/hud_section_title.dart';
 import '../widgets/hud_tab_bar.dart';
 import '../widgets/stat_list_panel.dart';
 import '../widgets/system_panel.dart';
+import 'blood_work_screen.dart';
 import 'day_rollover.dart';
 
 /// PROGRESS — what has actually changed, charted.
@@ -27,7 +30,16 @@ import 'day_rollover.dart';
 class ProgressScreen extends StatefulWidget {
   final ProgressRepository progressRepository;
 
-  const ProgressScreen({super.key, required this.progressRepository});
+  /// Health Connect. Optional in the sense that everything on this screen
+  /// works without it — the body scans, the XP bars and the blood work are all
+  /// entered or earned by hand.
+  final HealthRepository healthRepository;
+
+  const ProgressScreen({
+    super.key,
+    required this.progressRepository,
+    required this.healthRepository,
+  });
 
   @override
   State<ProgressScreen> createState() => _ProgressScreenState();
@@ -51,6 +63,42 @@ class _ProgressScreenState extends State<ProgressScreen>
   void openDay() {
     _today = widget.progressRepository.clock.now();
     _stream = widget.progressRepository.watch(_range);
+  }
+
+  bool _syncing = false;
+  String? _syncMessage;
+
+  Future<void> _sync() async {
+    setState(() {
+      _syncing = true;
+      _syncMessage = null;
+    });
+    try {
+      var status = await widget.healthRepository.status();
+      if (!status.authorised) {
+        status = await widget.healthRepository.requestPermissions();
+      }
+      if (!status.canSync) {
+        if (mounted) setState(() => _syncMessage = status.summary);
+        return;
+      }
+      final outcome = await widget.healthRepository.sync();
+      if (!mounted) return;
+      setState(() {
+        _syncMessage =
+            outcome.error ??
+            (outcome.didSomething
+                ? '${outcome.daysStored} days read'
+                      '${outcome.questsVerified.isEmpty ? '' : ' · cleared '
+                          '${outcome.questsVerified.join(', ')}'}'
+                : 'Nothing new to read.');
+        // The range query is built once when the stream is opened, so a new
+        // sync needs a new stream rather than waiting for a table event.
+        _stream = widget.progressRepository.watch(_range);
+      });
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
   }
 
   void _setRange(ChartRange range) {
@@ -82,7 +130,8 @@ class _ProgressScreenState extends State<ProgressScreen>
               _rangeBar(),
               const SizedBox(height: 14),
               ..._momentum(view),
-              ..._labs(view),
+              ..._health(view),
+              ..._bloodWorkLink(view),
             ],
           ],
         );
@@ -120,11 +169,7 @@ class _ProgressScreenState extends State<ProgressScreen>
             children: [
               _ScanHeader(scan: latest, baseline: baseline),
               const SizedBox(height: 16),
-              if (view.hasTrend)
-                HudLineChart(
-                  xLabels: [for (final s in view.scans) _shortDate(s.date)],
-                  series: _bodySeries(view),
-                )
+              if (view.hasTrend) ..._trendCharts(view)
               else
                 // One reading is not a trend, and drawing a single dot on an
                 // axis pretends otherwise. Say what is missing instead.
@@ -181,21 +226,14 @@ class _ProgressScreenState extends State<ProgressScreen>
       HudEntrance(
         index: 2,
         child: StatListPanel(
-          title: 'WATER & METABOLISM',
+          title: 'METABOLISM',
           rows: [
-            if (latest.totalBodyWaterKg != null)
-              StatRow(
-                'Total body water',
-                '${_trim(latest.totalBodyWaterKg!)} kg'
-                '${latest.totalBodyWaterPercent == null ? '' : ' · '
-                    '${_trim(latest.totalBodyWaterPercent!)} %'}',
-              ),
-            if (latest.extracellularWaterKg != null)
-              StatRow('Extracellular', '${_trim(latest.extracellularWaterKg!)} kg'),
-            if (latest.intracellularWaterKg != null)
-              StatRow('Intracellular', '${_trim(latest.intracellularWaterKg!)} kg'),
-            if (latest.ecwOverTbwPercent != null)
-              StatRow('ECW / TBW', '${_trim(latest.ecwOverTbwPercent!)} %'),
+            // Body water is deliberately NOT here. The Tanita prints TBW, ECW,
+            // ICW and the ratio between them, and none of it tells you
+            // anything you can act on: hydration swings with what you drank
+            // this morning, so it moves more between two readings than the fat
+            // it is meant to inform. It is still STORED — the report is the
+            // record — it is simply not shown.
             if (latest.bmrKcal != null)
               StatRow(
                 'BMR',
@@ -206,8 +244,6 @@ class _ProgressScreenState extends State<ProgressScreen>
               StatRow('Metabolic age', '${latest.metabolicAge}'),
             if (latest.phaseAngleDeg != null)
               StatRow('Phase angle', '${_trim(latest.phaseAngleDeg!)}°'),
-            if (latest.impedanceOhm != null)
-              StatRow('Impedance', '${latest.impedanceOhm} Ω'),
           ],
         ),
       ),
@@ -228,32 +264,79 @@ class _ProgressScreenState extends State<ProgressScreen>
     ];
   }
 
-  List<ChartSeries> _bodySeries(ProgressView view) {
-    List<FlSpot> spots(double? Function(BodyScan) pick) => [
-      for (final (i, scan) in view.scans.indexed)
-        if (pick(scan) != null) FlSpot(i.toDouble(), pick(scan)!),
+  /// One small chart per figure, rather than three series crammed onto one
+  /// axis.
+  ///
+  /// Weight in kilograms and body fat in percent do not share a scale — plotted
+  /// together, a 6 kg loss and a 7-point drop in body fat end up as two lines
+  /// that cannot both be read. Separate charts also mean every figure the
+  /// Tanita prints can be trended, not just the three that happened to fit.
+  List<Widget> _trendCharts(ProgressView view) {
+    final metrics = <(String, String, Color, double? Function(BodyScan))>[
+      ('WEIGHT', ' kg', AppColors.primary, (s) => s.weightKg),
+      ('BODY FAT', ' %', AppColors.accentMagenta, (s) => s.bodyFatPercent),
+      ('FAT MASS', ' kg', AppColors.accentMagenta, (s) => s.fatMassKg),
+      ('MUSCLE MASS', ' kg', AppColors.statStr, (s) => s.muscleMassKg),
+      ('SKELETAL MUSCLE', ' kg', AppColors.statStr, (s) => s.skeletalMuscleKg),
+      (
+        'VISCERAL FAT',
+        '',
+        AppColors.accentGold,
+        (s) => s.visceralFat?.toDouble(),
+      ),
+      ('BMI', '', AppColors.textSecondary, (s) => s.bmi),
+      (
+        'METABOLIC AGE',
+        '',
+        AppColors.textSecondary,
+        (s) => s.metabolicAge?.toDouble(),
+      ),
+      (
+        'BMR',
+        ' kcal',
+        AppColors.statRec,
+        (s) => s.bmrKcal?.toDouble(),
+      ),
     ];
 
-    return [
-      ChartSeries(
-        label: 'WEIGHT',
-        color: AppColors.primary,
-        unit: ' kg',
-        spots: spots((s) => s.weightKg),
-      ),
-      ChartSeries(
-        label: 'MUSCLE',
-        color: AppColors.statStr,
-        unit: ' kg',
-        spots: spots((s) => s.muscleMassKg),
-      ),
-      ChartSeries(
-        label: 'FAT',
-        color: AppColors.accentMagenta,
-        unit: ' %',
-        spots: spots((s) => s.bodyFatPercent),
-      ),
-    ];
+    final labels = [for (final s in view.scans) _shortDate(s.date)];
+    final charts = <Widget>[];
+
+    for (final (label, unit, colour, pick) in metrics) {
+      final spots = [
+        for (final (i, scan) in view.scans.indexed)
+          if (pick(scan) != null) FlSpot(i.toDouble(), pick(scan)!),
+      ];
+      // Two readings or it is not a trend.
+      if (spots.length < 2) continue;
+
+      charts.addAll([
+        Padding(
+          padding: const EdgeInsets.only(top: 14, bottom: 2),
+          child: Text(
+            label,
+            style: AppTextStyles.hudLabel.copyWith(
+              fontSize: 10,
+              color: AppColors.textDim,
+            ),
+          ),
+        ),
+        HudLineChart(
+          height: 130,
+          xLabels: labels,
+          series: [
+            ChartSeries(
+              label: label,
+              color: colour,
+              unit: unit,
+              spots: spots,
+            ),
+          ],
+        ),
+      ]);
+    }
+
+    return charts;
   }
 
   // --- Daily momentum -------------------------------------------------------
@@ -363,46 +446,223 @@ class _ProgressScreenState extends State<ProgressScreen>
     ];
   }
 
-  // --- Blood work ------------------------------------------------------------
+  // --- Daily health, from Health Connect ------------------------------------
 
-  List<Widget> _labs(ProgressView view) {
-    if (view.labs.isEmpty) return const [];
-    final flagged = view.flaggedLabs;
-
-    return [
-      const SizedBox(height: 18),
-      HudSectionTitle('BLOOD WORK'),
-      const SizedBox(height: 14),
-      if (flagged.isNotEmpty) ...[
+  List<Widget> _health(ProgressView view) {
+    if (!view.hasHealth) {
+      return [
+        const SizedBox(height: 18),
+        HudSectionTitle('DAILY HEALTH'),
+        const SizedBox(height: 14),
         SystemPanel(
-          title: 'OUTSIDE THE REFERENCE RANGE',
-          accent: AppColors.accentGold,
+          title: 'NOTHING SYNCED',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final lab in flagged) _LabRow(lab: lab),
-              const SizedBox(height: 8),
-              // The report's own flags, reproduced. Not a finding of the app's.
-              _Footnote(
-                'Flagged on the report itself, not by this app. What any of '
-                'it means is a conversation with your doctor.',
+              _Empty(
+                'Steps, sleep and resting heart rate appear here once Health '
+                'Connect is linked. Nothing in the routine depends on it — '
+                'every quest can still be answered by hand.',
+              ),
+              const SizedBox(height: 10),
+              _SyncButton(busy: _syncing, onPressed: _sync),
+              if (_syncMessage != null) ...[
+                const SizedBox(height: 8),
+                _Footnote(_syncMessage!),
+              ],
+            ],
+          ),
+        ),
+      ];
+    }
+
+    return [
+      const SizedBox(height: 18),
+      HudSectionTitle('DAILY HEALTH'),
+      const SizedBox(height: 14),
+      _SyncButton(busy: _syncing, onPressed: _sync),
+      if (_syncMessage != null) ...[
+        const SizedBox(height: 8),
+        _Footnote(_syncMessage!),
+      ],
+      const SizedBox(height: 12),
+      HudEntrance(
+        index: 5,
+        child: StatListPanel(
+          title: 'IN THIS WINDOW',
+          rows: [
+            StatRow('Days with data', '${view.health.length}'),
+            StatRow('Steps a day', '${view.averageSteps}'),
+            StatRow('Steps total', '${view.totalSteps}'),
+            if (view.totalDistanceKm > 0)
+              StatRow(
+                'Distance',
+                '${view.totalDistanceKm.toStringAsFixed(1)} km',
+              ),
+            if (view.averageSleepLabel != null)
+              StatRow('Sleep a night', view.averageSleepLabel!),
+            if (view.averageRestingHeartRate != null)
+              StatRow(
+                'Resting heart rate',
+                '${view.averageRestingHeartRate} bpm',
+              ),
+          ],
+        ),
+      ),
+      if (view.stepDays.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        HudEntrance(
+          index: 6,
+          child: SystemPanel(
+            title: 'STEPS',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                HudBarChart(
+                  bars: [
+                    for (final d in view.stepDays)
+                      ChartBar(
+                        label: _shortDate(d.date),
+                        value: d.steps!.toDouble(),
+                        color: AppColors.statSta,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                _Footnote(
+                  'Only days the phone reported. A day it was left at home is '
+                  'a gap, not a day of no steps.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+      if (view.heartDays.length >= 2) ...[
+        const SizedBox(height: 12),
+        HudEntrance(
+          index: 7,
+          child: SystemPanel(
+            title: 'RESTING HEART RATE',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                HudLineChart(
+                  xLabels: [for (final d in view.heartDays) _shortDate(d.date)],
+                  series: [
+                    ChartSeries(
+                      label: 'RESTING',
+                      color: AppColors.danger,
+                      unit: ' bpm',
+                      spots: [
+                        for (final (i, d) in view.heartDays.indexed)
+                          FlSpot(i.toDouble(), d.restingHeartRate!.toDouble()),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // The boundary again, in the one place it is most tempting to
+                // cross. A resting heart rate is a number this app draws.
+                _Footnote(
+                  'Charted, not interpreted. What a resting heart rate means '
+                  'for you is a conversation with your doctor.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+      if (view.sleepDays.length >= 2) ...[
+        const SizedBox(height: 12),
+        HudEntrance(
+          index: 8,
+          child: SystemPanel(
+            title: 'SLEEP',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                HudBarChart(
+                  unit: ' min',
+                  bars: [
+                    for (final d in view.sleepDays)
+                      ChartBar(
+                        label: _shortDate(d.date),
+                        value: d.sleepMinutes!.toDouble(),
+                        // Gold past seven hours — the plan's own target, and
+                        // the thing it calls the hardest part of the whole
+                        // transformation.
+                        color: d.sleepMinutes! >= 420
+                            ? AppColors.accentGold
+                            : AppColors.accentPurple,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                _Footnote(
+                  'Gold is seven hours or more. The plan calls sleep the '
+                  'hardest part of all of this, and the lever for the rest.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  // --- Blood work lives elsewhere -------------------------------------------
+
+  /// A link, not a section.
+  ///
+  /// The panel used to be on this screen and it did not belong: PROGRESS
+  /// answers "is my body changing?", and liver enzymes do not answer that.
+  /// It is a record that matters at the next test, not a training signal, and
+  /// putting it here invited reading it as one.
+  List<Widget> _bloodWorkLink(ProgressView view) {
+    if (view.labs.isEmpty) return const [];
+    final flagged = view.flaggedLabs.length;
+
+    return [
+      const SizedBox(height: 18),
+      InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => BloodWorkScreen(view: view),
+          ),
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: SystemPanel(
+          glow: 0.14,
+          child: Row(
+            children: [
+              Icon(Icons.science_outlined, size: 18, color: AppColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('BLOOD WORK', style: AppTextStyles.panelTitle),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${view.labs.length} results'
+                      '${flagged == 0 ? '' : ' · $flagged outside range'}',
+                      style: AppTextStyles.body.copyWith(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: AppColors.textDim,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-      ],
-      for (final entry in view.labsByPanel.entries) ...[
-        SystemPanel(
-          title: entry.key,
-          glow: 0.14,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [for (final lab in entry.value) _LabRow(lab: lab)],
-          ),
-        ),
-        const SizedBox(height: 10),
-      ],
+      ),
     ];
   }
 
@@ -645,64 +905,23 @@ class _Head extends StatelessWidget {
   );
 }
 
-/// One line of a lab report: name, value, and the range it was measured
-/// against. The range travels with the value because it differs by lab and
-/// method, and a number without it says nothing.
-class _LabRow extends StatelessWidget {
-  final LabResult lab;
+/// Pulls from Health Connect on demand.
+///
+/// On demand rather than in the background: a background sync needs a
+/// foreground service and a permanent notification, which is a lot of
+/// machinery for data nobody looks at more than once a day.
+class _SyncButton extends StatelessWidget {
+  final bool busy;
+  final VoidCallback onPressed;
 
-  const _LabRow({required this.lab});
+  const _SyncButton({required this.busy, required this.onPressed});
 
   @override
-  Widget build(BuildContext context) {
-    final flagged = lab.isFlagged;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 5,
-            child: Text(
-              lab.name,
-              style: AppTextStyles.body.copyWith(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  lab.reading,
-                  textAlign: TextAlign.right,
-                  style: AppTextStyles.readout.copyWith(
-                    fontSize: 12,
-                    color: flagged
-                        ? AppColors.accentGold
-                        : AppColors.textPrimary,
-                  ),
-                ),
-                if (lab.refText.isNotEmpty)
-                  Text(
-                    lab.refText,
-                    textAlign: TextAlign.right,
-                    style: AppTextStyles.hudLabel.copyWith(
-                      fontSize: 9,
-                      color: AppColors.textDim,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => GradientButton(
+    label: busy ? 'Reading…' : 'Sync Health Connect',
+    icon: busy ? null : Icons.sync,
+    onPressed: busy ? null : onPressed,
+  );
 }
 
 class _Empty extends StatelessWidget {

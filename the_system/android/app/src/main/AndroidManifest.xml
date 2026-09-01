@@ -29,6 +29,31 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
 
+    <!-- Phase 11 — Health Connect. READ ONLY, and every one of these is shown
+         to the user verbatim when Health Connect asks, so the list is kept to
+         exactly what the dashboard draws.
+
+         Weight and body fat are deliberately ABSENT: those come from the
+         Tanita scale by hand, and a second source for the same figure is how
+         two numbers start disagreeing about what you weigh. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE"/>
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED"/>
+    <uses-permission android:name="android.permission.health.READ_DISTANCE"/>
+    <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
+
+    <!-- Android 13 and below reach Health Connect as a separate Play app; from
+         14 it is part of the platform. Declaring the query lets the app see
+         whether it is there at all rather than failing blind. -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata"/>
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
+        </intent>
+    </queries>
+
     <application
         android:label="ARISE"
         android:name="${applicationName}"
@@ -54,7 +79,27 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- Health Connect opens this to ask WHY the app wants the data.
+                 Without it the permission sheet has no rationale link and
+                 some builds refuse the request outright. -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
+            </intent-filter>
         </activity>
+        <!-- Android 14+ looks for the rationale on an activity-alias rather
+             than on the activity itself. Declaring both covers either. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/>
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS"/>
+            </intent-filter>
+        </activity-alias>
+
         <!-- Re-arms the schedule after a reboot and after an app update.
              Both wipe pending alarms, and QUICKBOOT_POWERON is the
              manufacturer variant several Android skins send instead of the

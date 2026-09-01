@@ -7,6 +7,8 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:the_system/ai/ai_result.dart';
 import 'package:the_system/ai/gemini_client.dart';
+import 'package:the_system/ai/groq_client.dart';
+import 'package:the_system/ai/llm_router.dart';
 import 'package:the_system/ai/lanes/nutrition_lane.dart';
 import 'package:the_system/ai/lanes/trainer_lane.dart';
 import 'package:the_system/data/memory/memory_repository.dart';
@@ -28,11 +30,19 @@ void main() {
     if (!AppConfig.hasGeminiKey) return;
 
     final db = AppDatabase(NativeDatabase.memory());
-    final client = GeminiClient(db);
+    // The router, so the probe exercises the real path — including falling
+    // from Groq to Gemini if the first is busy or spent.
+    final client = LlmRouter(
+      db: db,
+      providers: [GroqClient(), GeminiClient(db)],
+    );
     final lane = NutritionLane(client);
 
     // ignore: avoid_print
-    print('LIVE chain: ${await client.resolveModel()}');
+    print(
+      'LIVE providers: '
+      '${client.providers.where((p) => p.isConfigured).map((p) => p.name).join(' -> ')}',
+    );
 
     for (final probe in [
       ('dinner', MealSlot.dinner, '1 bowl potato sabji+6 chapati+ 1 cup of tea'),

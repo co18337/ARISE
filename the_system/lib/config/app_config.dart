@@ -31,8 +31,10 @@ class AppConfig {
     }
     _loaded = true;
     debugPrint(
-      '[config] Gemini key ${hasGeminiKey ? 'present' : 'absent'} — '
-      '${hasGeminiKey ? 'live' : 'offline'} trainer and embeddings',
+      '[config] Groq ${hasGroqKey ? 'present' : 'absent'} · '
+      'Gemini ${hasGeminiKey ? 'present' : 'absent'} — '
+      '${hasGroqKey || hasGeminiKey ? 'live' : 'offline'} trainer and '
+      'nutrition',
     );
   }
 
@@ -57,20 +59,49 @@ class AppConfig {
   /// now resolved from the live list at runtime.
   static String get configuredGeminiModel => _read('GEMINI_MODEL');
 
+  /// Groq. Leads the chain because it is markedly faster — sub-second against
+  /// Gemini's two to eight — which is what makes a second summoning feel
+  /// instant rather than ceremonial.
+  static String get groqApiKey => _read('GROQ_API_KEY');
+
+  static bool get hasGroqKey => groqApiKey.isNotEmpty;
+
+  /// Pin a Groq model, or leave empty for the default below.
+  static String get configuredGroqModel => _read('GROQ_MODEL');
+
+  /// For display only — what is pinned, or "auto".
+  ///
+  /// There is deliberately NO hardcoded default. This client shipped pinned to
+  /// llama-3.3-70b-versatile and 404'd on the first real call because that
+  /// model does not exist on the key. The model is resolved from the live list
+  /// now, exactly as Gemini's is.
+  static String get groqModel {
+    final pinned = configuredGroqModel;
+    return pinned.isEmpty ? 'auto' : pinned;
+  }
+
   /// For display only — what is pinned, or "auto".
   static String get geminiModel {
     final pinned = configuredGeminiModel;
     return pinned.isEmpty ? 'auto' : pinned;
   }
 
-  static String get geminiEmbeddingModel =>
-      _read('GEMINI_EMBEDDING_MODEL', fallback: 'text-embedding-004');
+  /// Pin an embedding model, or leave blank to resolve from the live list.
+  ///
+  /// There is deliberately NO hardcoded fallback any more. This defaulted to
+  /// `text-embedding-004`, which does not exist on this key — the third time a
+  /// pinned model name has been wrong here, after gemini-2.0-flash and
+  /// llama-3.3-70b-versatile. The names are resolved now.
+  static String get geminiEmbeddingModel => _read('GEMINI_EMBEDDING_MODEL');
 
   /// Test seam: lets a test pretend a key is or isn't present.
-  static void overrideForTest({String? apiKey}) {
+  static void overrideForTest({String? apiKey, String? groqKey}) {
     _loaded = true;
     dotenv.testLoad(
-      fileInput: apiKey == null ? '' : 'GEMINI_API_KEY=$apiKey',
+      fileInput: [
+        if (apiKey != null) 'GEMINI_API_KEY=$apiKey',
+        if (groqKey != null) 'GROQ_API_KEY=$groqKey',
+      ].join('\n'),
     );
   }
 }

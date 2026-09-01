@@ -3,7 +3,7 @@ import 'dart:convert';
 import '../../game/game.dart';
 import '../../models/models.dart';
 import '../ai_result.dart';
-import '../gemini_client.dart';
+import '../llm_router.dart';
 
 /// One food from an entry, costed.
 class AnalysedItem {
@@ -107,7 +107,9 @@ class FoodAnalysis {
 /// whether the meal was a good idea, and it is told not to — interpreting what
 /// someone should eat is a doctor's job, and this app totals and displays.
 class NutritionLane {
-  final GeminiClient client;
+  /// The router, not a provider. The lane never learns which model answered —
+  /// that is the router's business and the AI log's.
+  final LlmRouter client;
 
   const NutritionLane(this.client);
 

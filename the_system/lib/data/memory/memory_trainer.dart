@@ -43,6 +43,8 @@ class MemoryTrainerAdvisor implements TrainerAdvisor {
     required Map<String, int> clearedByExercise,
     int sessionsCompleted = 0,
     BodyEmphasis emphasis = BodyEmphasis.none,
+    Map<String, ExerciseRecord> records = const {},
+    Deload? deload,
   }) async {
     // Passed straight through. This advisor adds a NOTE; the phase gate and
     // the scan emphasis decide the numbers, and those belong to the rule
@@ -53,6 +55,8 @@ class MemoryTrainerAdvisor implements TrainerAdvisor {
       clearedByExercise: clearedByExercise,
       sessionsCompleted: sessionsCompleted,
       emphasis: emphasis,
+      records: records,
+      deload: deload,
     );
 
     if (plan.isRestDay) return plan;
@@ -123,6 +127,7 @@ class MemoryTrainerAdvisor implements TrainerAdvisor {
     // would silently vanish the moment a key was added.
     gate: plan.gate,
     emphasisReason: plan.emphasisReason,
+    deload: plan.deload,
   );
 
   /// A recalled passage, flattened for a prompt.

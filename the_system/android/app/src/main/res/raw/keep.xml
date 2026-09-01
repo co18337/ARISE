@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stops R8 stripping the notification icon from release builds.
+
+     ic_notification is referenced ONLY from Dart, as the string
+     '@drawable/ic_notification' handed to flutter_local_notifications, which
+     resolves it at runtime with getIdentifier(). Nothing in Kotlin or in any
+     layout mentions it, so resource shrinking correctly concluded it was dead
+     and removed it — and the plugin then failed to initialise with
+     "invalid_icon: the resource could not be found".
+
+     The consequence was total and silent: initialise() failed, schedule()
+     returned early, and Android held ZERO alarms. Every notification simply
+     never existed. Debug builds do not shrink, which is why it worked on the
+     bench and not on the phone. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notification" />

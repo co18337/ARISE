@@ -107,6 +107,20 @@ class Exercise {
   /// open.
   final String cue;
 
+  /// How much weight one step of progression adds, in HALF-KILOS. Zero means
+  /// the movement carries no external load at all.
+  ///
+  /// This is what makes progression honest for gym work. Without it, double
+  /// progression on a lat pulldown means more and more reps at the same
+  /// weight forever — which is not how anyone gets stronger, and is what the
+  /// app did until the column existed.
+  ///
+  /// 5 (2.5 kg) for dumbbells and cables, 10 (5 kg) for barbells and machines
+  /// where the smallest jump is bigger.
+  final int loadStepHalfKg;
+
+  bool get isLoaded => loadStepHalfKg > 0;
+
   /// Starting prescription for someone who has never done it here.
   final int startSets;
   final int startTarget;
@@ -134,6 +148,7 @@ class Exercise {
     required this.stat,
     required this.unit,
     required this.cue,
+    this.loadStepHalfKg = 0,
     required this.startSets,
     required this.startTarget,
     required this.step,

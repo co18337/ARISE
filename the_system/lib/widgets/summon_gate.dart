@@ -50,7 +50,16 @@ class _SummonGateState extends State<SummonGate> {
 
   /// The animation runs for at least this long once tapped, so a fast call
   /// does not make the whole thing flash past unseen.
-  static const Duration _minimumCeremony = Duration(milliseconds: 2200);
+  /// The floor, not the length.
+  ///
+  /// It was a flat 2.2 seconds, which made every summoning take 2.2 seconds
+  /// even when there was nothing to wait for. Now the WORK sets the pace and
+  /// this only stops it flashing past: a first summon with a live trainer call
+  /// naturally lands around three or four seconds, and a cached or rule-based
+  /// one finishes in under one. That is the behaviour without special-casing
+  /// either — the ceremony is exactly as long as the System is actually
+  /// thinking.
+  static const Duration _minimumCeremony = Duration(milliseconds: 900);
 
   Future<void> _arise() async {
     if (_summoning) return;
@@ -87,7 +96,15 @@ class _SummonGateState extends State<SummonGate> {
             ),
           ),
           const SizedBox(height: 16),
-          _Sigil(playing: _summoning),
+          // Given the width of the panel rather than a fixed 190dp, so the
+          // summoning fills the screen it is supposed to command instead of
+          // sitting in it as a stamp.
+          LayoutBuilder(
+            builder: (context, constraints) => _Sigil(
+              playing: _summoning,
+              size: constraints.maxWidth.clamp(220.0, 420.0),
+            ),
+          ),
           const SizedBox(height: 18),
           if (player != null) ...[
             _StatusLine('HUNTER', player.hunterName),
@@ -139,17 +156,17 @@ class _SummonGateState extends State<SummonGate> {
 class _Sigil extends StatelessWidget {
   final bool playing;
 
-  const _Sigil({required this.playing});
+  final double size;
 
-  static const double _size = 190;
+  const _Sigil({required this.playing, this.size = 260});
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 400),
-        width: _size,
-        height: _size,
+        width: size,
+        height: size,
         decoration: ShapeDecoration(
           color: AppColors.surfaceRaised.withValues(alpha: 0.5),
           shape: CircleBorder(
@@ -177,7 +194,7 @@ class _Sigil extends StatelessWidget {
             // Decoded at display size rather than at source size: 117 frames
             // at 498px would otherwise be decoded in full, several times a
             // second, for a picture drawn at 190dp.
-            cacheWidth: (_size * MediaQuery.devicePixelRatioOf(context)).round(),
+            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
             gaplessPlayback: true,
             // The gate works without the animation — it is gitignored, so a
             // fresh clone simply has no file. A rank crest stands in.

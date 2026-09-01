@@ -67,6 +67,11 @@ dependencies:
   fl_chart: ^1.2.0
   flutter_local_notifications: ^22.3.0
   timezone: ^0.11.1
+  # Health Connect on Android. READ-ONLY and one-way: the System reads steps,
+  # sleep and heart rate, and never writes anything back. Health Connect is the
+  # system-level store other apps sync into, so this picks up the phone's own
+  # step counter without asking for a second account anywhere.
+  health: ^13.3.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -4,6 +4,7 @@ import '../../game/game.dart';
 import '../../models/models.dart';
 import '../day_key.dart';
 import '../db/database.dart';
+import 'health_repository.dart';
 
 /// How far back a chart looks.
 ///
@@ -210,12 +211,63 @@ class ProgressView {
   /// for the same reason the scans are not: a panel is run twice a year.
   final List<LabResult> labs;
 
+  /// Synced health days, oldest first, RANGE-FILTERED.
+  ///
+  /// Unlike the scans and the labs, this is daily data over months — which is
+  /// precisely what the range filter was built for and, until Health Connect
+  /// arrived, had nothing to filter but the XP bars.
+  final List<HealthDayView> health;
+
   const ProgressView({
     required this.range,
     required this.days,
     required this.scans,
     this.labs = const [],
+    this.health = const [],
   });
+
+  bool get hasHealth => health.isNotEmpty;
+
+  /// Days in the window that actually reported steps.
+  List<HealthDayView> get stepDays => [
+    for (final d in health)
+      if (d.steps != null) d,
+  ];
+
+  List<HealthDayView> get sleepDays => [
+    for (final d in health)
+      if (d.sleepMinutes != null) d,
+  ];
+
+  List<HealthDayView> get heartDays => [
+    for (final d in health)
+      if (d.restingHeartRate != null) d,
+  ];
+
+  int get totalSteps =>
+      stepDays.fold(0, (sum, d) => sum + (d.steps ?? 0));
+
+  /// Mean over the days that REPORTED, not over the window. A phone left at
+  /// home does not lower your average; it simply says nothing about that day.
+  int get averageSteps =>
+      stepDays.isEmpty ? 0 : totalSteps ~/ stepDays.length;
+
+  String? get averageSleepLabel {
+    if (sleepDays.isEmpty) return null;
+    final mins =
+        sleepDays.fold(0, (sum, d) => sum + (d.sleepMinutes ?? 0)) ~/
+        sleepDays.length;
+    return '${mins ~/ 60}h ${(mins % 60).toString().padLeft(2, '0')}m';
+  }
+
+  int? get averageRestingHeartRate {
+    if (heartDays.isEmpty) return null;
+    return heartDays.fold(0, (sum, d) => sum + (d.restingHeartRate ?? 0)) ~/
+        heartDays.length;
+  }
+
+  double get totalDistanceKm =>
+      health.fold(0.0, (sum, d) => sum + (d.distanceM ?? 0) / 1000);
 
   /// Lab lines grouped by the panel they were printed under, in report order.
   Map<String, List<LabResult>> get labsByPanel {
@@ -311,6 +363,13 @@ class ProgressRepository {
             ..orderBy([(l) => OrderingTerm.desc(l.day)]))
           .get();
 
+      final healthQuery = db.select(db.healthDays)
+        ..orderBy([(h) => OrderingTerm.asc(h.day)]);
+      if (from != null) {
+        healthQuery.where((h) => h.day.isBiggerOrEqualValue(from));
+      }
+      final healthRows = await healthQuery.get();
+
       final byDay = <int, List<SegmentReading>>{};
       for (final seg in segments) {
         byDay.putIfAbsent(seg.day, () => []).add(_toSegment(seg));
@@ -323,6 +382,7 @@ class ProgressRepository {
           for (final m in measurements) _toScan(m, byDay[m.day] ?? const []),
         ],
         labs: [for (final l in labs) _toLab(l)],
+        health: [for (final h in healthRows) _toHealth(h)],
       );
     });
   }
@@ -497,6 +557,16 @@ class ProgressRepository {
     otherMassKg: r.otherMassKg,
     fatRating: r.fatRating,
     muscleRating: r.muscleRating,
+  );
+
+  HealthDayView _toHealth(HealthDayRow r) => HealthDayView(
+    date: dateOfDayKey(r.day),
+    steps: r.steps,
+    sleepMinutes: r.sleepMinutes,
+    restingHeartRate: r.restingHeartRate,
+    activeKcal: r.activeKcal,
+    distanceM: r.distanceM,
+    workoutMinutes: r.workoutMinutes,
   );
 
   LabResult _toLab(LabResultRow r) => LabResult(

@@ -9,6 +9,8 @@ library;
 
 import '../models/models.dart';
 import 'body_emphasis.dart';
+import 'deload.dart';
+import 'progression.dart';
 
 /// Who wrote the note above today's session.
 enum TrainerNoteSource {
@@ -95,9 +97,37 @@ enum TrainingPhase {
 
   /// What leaving this phase is supposed to look like, in plain words.
   ///
-  /// Shown, not enforced by itself — [PhaseGate] is what enforces it. Stated
-  /// because a phase you cannot see the end of is one you stop believing in.
+  /// Stated because a phase you cannot see the end of is one you stop
+  /// believing in. [tests] is the machine-checkable version of this sentence,
+  /// and PhaseGate enforces THAT — the two must be kept saying the same thing.
   final String benchmark;
+
+  /// What must actually have been done to leave: movement id, and the amount
+  /// achieved in a single set.
+  ///
+  /// Checked against BEST EVER, not most recent. A benchmark asks what you are
+  /// capable of, and one bad Tuesday does not take away a thing you have
+  /// already proven.
+  List<({String exerciseId, int atLeast})> get tests => switch (this) {
+    TrainingPhase.groundwork => const [
+      (exerciseId: 'steady_run', atLeast: 15),
+      (exerciseId: 'plank', atLeast: 30),
+    ],
+    TrainingPhase.reset => const [
+      (exerciseId: 'steady_run', atLeast: 20),
+      (exerciseId: 'dead_hang', atLeast: 30),
+    ],
+    TrainingPhase.fatBurn => const [
+      (exerciseId: 'steady_run', atLeast: 30),
+      (exerciseId: 'pushups', atLeast: 15),
+    ],
+    TrainingPhase.buildSculpt => const [
+      (exerciseId: 'pullups', atLeast: 1),
+      (exerciseId: 'pushups', atLeast: 30),
+    ],
+    // Nothing to prove to leave the last phase; there is nowhere to go.
+    TrainingPhase.sharpen => const [],
+  };
 
   const TrainingPhase({
     required this.label,
@@ -166,6 +196,7 @@ class PhaseGate {
     required this.byCalendar,
     required this.reached,
     required this.sessionsDone,
+    this.unmetTests = const [],
   });
 
   /// True when the weeks have passed but the work has not been done.
@@ -180,28 +211,59 @@ class PhaseGate {
   }
 
   /// One line for the session card, or null when nothing is being held back.
+  ///
+  /// Names the binding reason rather than listing every unmet condition — a
+  /// hold you cannot act on is just a complaint.
   String? get holdReason {
     if (!isHeldBack) return null;
     final missing = sessionsRemaining;
-    return missing <= 0
-        ? null
-        : 'Still on ${reached.label}: $missing more completed '
-              '${missing == 1 ? 'session' : 'sessions'} to earn '
-              '${reached.next?.label ?? ''}.';
+    if (missing > 0) {
+      return 'Still on ${reached.label}: $missing more completed '
+          '${missing == 1 ? 'session' : 'sessions'} to earn '
+          '${reached.next?.label ?? ''}.';
+    }
+    if (unmetTests.isNotEmpty) {
+      return 'Still on ${reached.label}: the work is done, the benchmark is '
+          'not — ${reached.benchmark}.';
+    }
+    return null;
   }
 
-  /// Resolves the phase from the calendar and the record together.
+  /// Benchmarks of the phase you are on that are still unmet.
+  final List<String> unmetTests;
+
+  /// Resolves the phase from the calendar, the record and the benchmarks.
+  ///
+  /// THREE conditions now, all of them necessary. The weeks say enough time
+  /// has passed for the adaptation to happen; the sessions say the work was
+  /// actually done; the benchmark says it worked. Any two without the third
+  /// promotes somebody who is not ready — which for a beginner is the
+  /// difference between December 2027 and stopping in March.
   static PhaseGate resolve({
     required int week,
     required int sessionsCompleted,
+    Map<String, ExerciseRecord> records = const {},
   }) {
     final byCalendar = TrainingPhase.forWeek(week);
 
+    List<String> unmet(TrainingPhase phase) => [
+      for (final test in phase.tests)
+        if ((records[test.exerciseId]?.bestActual ?? 0) < test.atLeast)
+          '${test.exerciseId} ${test.atLeast}',
+    ];
+
     var reached = TrainingPhase.groundwork;
     for (final phase in TrainingPhase.values) {
+      // To be IN a phase you must have cleared the one before it, benchmark
+      // included. The first phase has nothing before it.
+      final previous = phase.index == 0
+          ? null
+          : TrainingPhase.values[phase.index - 1];
       final earned =
           week >= phase.startWeek &&
-          sessionsCompleted >= phase.sessionsRequired;
+          sessionsCompleted >= phase.sessionsRequired &&
+          (previous == null ||
+              (records.isEmpty ? true : unmet(previous).isEmpty));
       if (earned) reached = phase;
     }
 
@@ -209,6 +271,7 @@ class PhaseGate {
       byCalendar: byCalendar,
       reached: reached,
       sessionsDone: sessionsCompleted,
+      unmetTests: unmet(reached),
     );
   }
 }
@@ -226,6 +289,13 @@ int programmeWeek({required int startDay, required int day}) {
 
 /// What one exercise is asking of you today.
 class SetPrescription {
+  /// Suggested weight in half-kilos, or null when the movement carries none
+  /// or has never been performed. A suggestion, never an instruction — the
+  /// number you actually lift is what gets recorded.
+  final int? loadHalfKg;
+
+  double? get loadKg => loadHalfKg == null ? null : loadHalfKg! / 2;
+
   final Exercise exercise;
 
   /// How many sets.
@@ -238,10 +308,16 @@ class SetPrescription {
     required this.exercise,
     required this.sets,
     required this.target,
+    this.loadHalfKg,
   });
 
-  /// "3 × 12 reps"
-  String get summary => '$sets × $target ${exercise.unit.label}';
+  /// "3 × 12 reps", or "3 × 12 reps @ 27.5 kg" once there is a weight.
+  String get summary {
+    final base = '$sets × $target ${exercise.unit.label}';
+    final kg = loadKg;
+    if (kg == null) return base;
+    return '$base @ ${kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg} kg';
+  }
 
   /// Total work in the session, for a completion bar.
   int get totalUnits => sets * target;
@@ -263,24 +339,74 @@ SetPrescription prescribeFor(
   /// double-progression result rather than folded into it, so the emphasis
   /// can change between scans without disturbing the overload history.
   int extraSets = 0,
+
+  /// What the record says about this movement. Optional so a caller with no
+  /// history still gets a sensible beginner's prescription.
+  ExerciseRecord record = ExerciseRecord.none,
+
+  /// The week's back-off. Cuts SETS only — reps and weight are held, so the
+  /// week recovers without detraining what the block built.
+  Deload? deload,
 }) {
   final cleared = clearedSessions < 0 ? 0 : clearedSessions;
 
   final span = exercise.targetCeiling - exercise.startTarget;
   final maxTargetSteps = exercise.step <= 0 ? 0 : span ~/ exercise.step;
 
-  final targetSteps = cleared < maxTargetSteps ? cleared : maxTargetSteps;
+  // THE MARGIN, not just the tick. Finishing is binary; how far past the
+  // prescription you finished is the thing that says whether the step is the
+  // right size. Twelve-minute runs logged at seventeen mean the step is too
+  // small, and counting only "completed" could never see that.
+  //
+  // Doubled or held, never more and never reversed: an accelerated step that
+  // turns out to be wrong costs one hard session, and a halved one costs
+  // nothing at all. Regression is a deload's job, not a step size's.
+  final earned = record.isEasy
+      ? cleared * 2
+      : record.isHard
+      ? cleared ~/ 2
+      : cleared;
 
-  final earnedSets = cleared - maxTargetSteps;
+  final targetSteps = earned < maxTargetSteps ? earned : maxTargetSteps;
+
+  final earnedSets = earned - maxTargetSteps;
   final progressionSets = earnedSets <= 0 ? 0 : (earnedSets > 2 ? 2 : earnedSets);
 
   return SetPrescription(
     exercise: exercise,
-    sets: exercise.startSets +
-        progressionSets +
-        (extraSets < 0 ? 0 : (extraSets > 1 ? 1 : extraSets)),
+    sets: DeloadRule.setsFor(
+      exercise.startSets +
+          progressionSets +
+          (extraSets < 0 ? 0 : (extraSets > 1 ? 1 : extraSets)),
+      deload,
+    ),
     target: exercise.startTarget + targetSteps * exercise.step,
+    loadHalfKg: _loadFor(exercise, record, targetSteps, maxTargetSteps),
   );
+}
+
+/// The weight to suggest, in half-kilos, or null for an unloaded movement.
+///
+/// Taken from what was LAST ACTUALLY LIFTED rather than from a formula: the
+/// app has no idea what you can bench, and inventing a number is how somebody
+/// gets hurt on their first session. The first time, it says nothing and the
+/// screen asks you to pick something you can control.
+///
+/// After that it is classic double progression: hold the weight while the reps
+/// climb, and add one step once the reps top out — which is the moment the
+/// weight, not the rep count, has become the thing holding you back.
+int? _loadFor(
+  Exercise exercise,
+  ExerciseRecord record,
+  int targetSteps,
+  int maxTargetSteps,
+) {
+  if (!exercise.isLoaded) return null;
+  final last = record.lastLoadHalfKg;
+  if (last == null) return null;
+
+  final atCeiling = maxTargetSteps > 0 && targetSteps >= maxTargetSteps;
+  return atCeiling ? last + exercise.loadStepHalfKg : last;
 }
 
 /// A whole session: what today is, and everything it asks for.
@@ -308,6 +434,9 @@ class SessionPlan {
   /// back, which is the normal case.
   final PhaseGate? gate;
 
+  /// The week's back-off, if there is one.
+  final Deload? deload;
+
   /// One line saying which regions the last scan put the extra work into.
   final String? emphasisReason;
 
@@ -320,6 +449,7 @@ class SessionPlan {
     this.noteSource = TrainerNoteSource.none,
     this.gate,
     this.emphasisReason,
+    this.deload,
   });
 
   /// A plain-language description of today, for the trainer to comment on.
@@ -358,5 +488,13 @@ abstract class TrainerAdvisor {
 
     /// Which regions the last body scan says to favour.
     BodyEmphasis emphasis = BodyEmphasis.none,
+
+    /// What the record says about each movement: sessions cleared, weight last
+    /// lifted, and how far past the ask recent sets landed. Optional, so a
+    /// caller with no history still gets a beginner's session.
+    Map<String, ExerciseRecord> records = const {},
+
+    /// The week's back-off, if there is one. Null is a normal week.
+    Deload? deload,
   });
 }

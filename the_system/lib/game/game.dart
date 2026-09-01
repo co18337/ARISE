@@ -6,7 +6,9 @@
 export 'achievements.dart';
 export 'alerts.dart';
 export 'body_emphasis.dart';
+export 'progression.dart';
 export 'clock.dart';
+export 'deload.dart';
 export 'game_rules.dart';
 export 'level_curve.dart';
 export 'nutrition.dart';

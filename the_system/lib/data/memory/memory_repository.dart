@@ -211,27 +211,46 @@ class MemoryRepository {
   /// The upgrade path for the day the Gemini embedder is switched on: the
   /// stored text is the source of truth, the vectors are a derived cache, and
   /// a cache built by a different model has to be rebuilt rather than trusted.
-  Future<int> reembedAll() async {
+  Future<int> reembedAll({int batchSize = 40}) async {
+    // Settle the name BEFORE comparing against it, or a resolving embedder
+    // reports one name here and a different one when it writes — and every
+    // chunk looks stale forever.
+    await embedder.prepare();
+
     final chunks = await db.select(db.memoryChunks).get();
     final stale = chunks.where((c) => c.embedder != embedder.name).toList();
     if (stale.isEmpty) return 0;
 
-    final vectors = await embedder.embedAll([for (final c in stale) c.content]);
+    // BATCHED. A corpus of several hundred chunks in one request is a body
+    // large enough to be rejected outright, and a failure halfway through
+    // would leave the store half-converted — with two incomparable embedders
+    // in it, which is the one state the design exists to prevent.
+    var converted = 0;
+    for (var start = 0; start < stale.length; start += batchSize) {
+      final batch = stale.skip(start).take(batchSize).toList();
+      final vectors = await embedder.embedAll([
+        for (final c in batch) c.content,
+      ]);
 
-    await db.transaction(() async {
-      for (final (i, chunk) in stale.indexed) {
-        await (db.update(db.memoryChunks)..where((c) => c.id.equals(chunk.id)))
-            .write(
-          MemoryChunksCompanion(
-            embedding: Value(packVector(vectors[i])),
-            dimensions: Value(embedder.dimensions),
-            embedder: Value(embedder.name),
-          ),
-        );
-      }
-    });
+      // One transaction PER BATCH, so an interruption leaves whole batches
+      // converted rather than a torn one.
+      await db.transaction(() async {
+        for (final (i, chunk) in batch.indexed) {
+          await (db.update(db.memoryChunks)
+                ..where((c) => c.id.equals(chunk.id)))
+              .write(
+            MemoryChunksCompanion(
+              embedding: Value(packVector(vectors[i])),
+              dimensions: Value(embedder.dimensions),
+              embedder: Value(embedder.name),
+            ),
+          );
+        }
+      });
+      converted += batch.length;
+    }
 
-    return stale.length;
+    return converted;
   }
 
   /// Deletes documents, optionally only those whose externalId starts with

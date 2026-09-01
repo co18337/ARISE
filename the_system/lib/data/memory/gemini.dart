@@ -41,8 +41,48 @@ class GeminiEmbedder implements Embedder {
   GeminiEmbedder({http.Client? client, this.dimensions = 768})
       : client = client ?? http.Client();
 
+  /// Resolved once per session, like every other model name in this app.
+  String? _model;
+
   @override
-  String get name => 'gemini-${AppConfig.geminiEmbeddingModel}-$dimensions';
+  String get name => 'gemini-${_model ?? 'auto'}-$dimensions';
+
+  @override
+  Future<void> prepare() => resolveModel();
+
+  /// The embedding model this key can actually use.
+  ///
+  /// ASKED OF THE API. This class shipped pinned to `text-embedding-004`,
+  /// which returns 404 on this key — the third pinned model name to be wrong
+  /// in this codebase. Anything advertising embedContent will do; newer first.
+  Future<String?> resolveModel() async {
+    final configured = AppConfig.geminiEmbeddingModel;
+    if (configured.isNotEmpty) return _model = configured;
+    if (_model != null) return _model;
+
+    try {
+      final response = await client
+          .get(
+            Uri.parse('$_base/models?key=${AppConfig.geminiApiKey}&pageSize=200'),
+          )
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) return null;
+
+      final decoded = jsonDecode(response.body) as Map<String, Object?>;
+      final names = [
+        for (final m in (decoded['models'] as List? ?? const []))
+          if (m is Map &&
+              ((m['supportedGenerationMethods'] as List?) ?? const [])
+                  .contains('embedContent'))
+            (m['name'] as String? ?? '').replaceFirst('models/', ''),
+      ]..removeWhere((n) => n.isEmpty || n.contains('preview'));
+
+      names.sort((a, b) => b.compareTo(a));
+      return _model = names.isEmpty ? null : names.first;
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Future<List<Float32List>> embedAll(List<String> texts) async {
@@ -51,7 +91,10 @@ class GeminiEmbedder implements Embedder {
     }
     if (texts.isEmpty) return const [];
 
-    final model = AppConfig.geminiEmbeddingModel;
+    final model = await resolveModel();
+    if (model == null) {
+      throw const GeminiUnavailable('no embedding model available to this key');
+    }
     final uri = Uri.parse(
       '$_base/models/$model:batchEmbedContents?key=${AppConfig.geminiApiKey}',
     );

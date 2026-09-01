@@ -156,10 +156,15 @@ void main() {
     final script = File('tool/fetch_exercise_gifs.sh').readAsStringSync();
     for (final exercise in ExerciseCatalog.all) {
       if (exercise.demoAsset == null) continue;
+      // Keyed by the ASSET, not the exercise id. Several movements share one
+      // animation — long_run and steady_run are the same footage, and so are
+      // hill_strides and sprint_interval — so the script has one line per
+      // file, which is what it actually fetches.
       expect(
         script,
-        contains('${exercise.id}:'),
-        reason: '${exercise.id} has no line in the fetch script',
+        contains('${exercise.demoAsset}:'),
+        reason: '${exercise.id} wants ${exercise.demoAsset}.gif, which has no '
+            'line in the fetch script',
       );
     }
   });

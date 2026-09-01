@@ -34,6 +34,15 @@ class GameRules {
     return xpEarned >= xpAvailable * streakQualifyingFraction;
   }
 
+  /// XP for one set done BEYOND the prescription.
+  ///
+  /// Roughly half what a prescribed set is worth: a session is 20 XP through
+  /// its quest and typically four to six sets, so a prescribed set is worth
+  /// about four. Extra work is real work and the app should honour it — at a
+  /// lower rate, so the incentive still points at doing the plan rather than
+  /// at padding the numbers.
+  static const int xpPerExtraSet = 2;
+
   /// How far back to reconstruct missed days when the app hasn't been opened
   /// for a while. Bounded so a wrong device clock can't trigger a
   /// years-long backfill.

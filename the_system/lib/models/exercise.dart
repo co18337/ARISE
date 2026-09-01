@@ -23,6 +23,43 @@ enum ExerciseKind {
   const ExerciseKind(this.label);
 }
 
+/// Where a movement happens.
+///
+/// On the session card so the day tells you where to go before you leave the
+/// house. Gym access arrived in September 2026 — the plan document predates
+/// it and its home-equipment shopping list is obsolete.
+enum Venue {
+  gym('GYM'),
+
+  /// The park's pull-up bar, and the ground under it.
+  park('PARK'),
+
+  /// Roads and the park loop. Running and sprinting.
+  outdoor('OUTDOOR');
+
+  final String label;
+
+  const Venue(this.label);
+}
+
+/// Which part of the body a movement loads, in the terms the body-composition
+/// scan reports.
+///
+/// Deliberately the SCAN's vocabulary rather than an anatomy chart's: the
+/// whole point is that a segment rated below average can be given more volume,
+/// and that only works if the exercise library and the report agree on what a
+/// "trunk" is.
+enum BodyRegion {
+  trunk('TRUNK'),
+  upperBody('UPPER BODY'),
+  lowerBody('LOWER BODY'),
+  wholeBody('WHOLE BODY');
+
+  final String label;
+
+  const BodyRegion(this.label);
+}
+
 /// How one set of an exercise is measured.
 enum LoadUnit {
   reps('reps'),
@@ -44,6 +81,13 @@ class Exercise {
   final String id;
   final String name;
   final ExerciseKind kind;
+
+  /// Where to do it. Gym, park bar, or out on the road.
+  final Venue venue;
+
+  /// Which segment of the scan it loads, so a trunk rated below average can be
+  /// given more of the session. See BodyEmphasis.
+  final BodyRegion region;
 
   /// Which stat completing it feeds. Cardio builds STA, lifting builds STR.
   final StatType stat;
@@ -77,6 +121,8 @@ class Exercise {
     required this.id,
     required this.name,
     required this.kind,
+    required this.venue,
+    required this.region,
     required this.stat,
     required this.unit,
     required this.cue,

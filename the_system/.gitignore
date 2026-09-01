@@ -59,3 +59,15 @@ assets/config/.env
 # non-commercial use only. Run the script to get them on a new machine.
 # ---------------------------------------------------------------------------
 assets/exercises/*.gif
+
+# Summoning animation — anime footage, personal local use only, same rule as
+# the exercise demonstrations. Never committed, never redistributed.
+assets/solo-leveling-*.gif
+
+# Launcher icon source artwork — personal, kept local like the other media.
+# The GENERATED mipmaps under android/app/src/main/res ARE committed; they are
+# what the build needs and they are small.
+assets/icon/source_crest.png
+assets/icon/crest.png
+
+assets/icons/cropped_badges/

@@ -4,9 +4,12 @@
 // what makes the progression rules testable without a device and swappable
 // without touching storage or widgets.
 export 'achievements.dart';
+export 'alerts.dart';
+export 'body_emphasis.dart';
 export 'clock.dart';
 export 'game_rules.dart';
 export 'level_curve.dart';
+export 'nutrition.dart';
 export 'rank.dart';
 export 'rewards.dart';
 export 'routine.dart';

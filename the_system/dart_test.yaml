@@ -1,0 +1,9 @@
+# Tests tagged `live` reach the real Gemini API with the key in
+# assets/config/.env. They are excluded from `flutter test` so the normal suite
+# stays hermetic, offline and free.
+#
+# Run one deliberately with:
+#   flutter test test/live_probe_test.dart --tags live --timeout none
+tags:
+  live:
+    skip: "needs a real API key and network — run explicitly with --tags live"

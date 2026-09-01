@@ -50,8 +50,18 @@ class AppConfig {
   /// is gated on this, and everything else carries on without it.
   static bool get hasGeminiKey => geminiApiKey.isNotEmpty;
 
-  static String get geminiModel =>
-      _read('GEMINI_MODEL', fallback: 'gemini-2.0-flash');
+  /// Whatever GEMINI_MODEL is pinned to, or empty for "ask the API".
+  ///
+  /// There is deliberately NO hardcoded default any more. The app shipped
+  /// pinned to gemini-2.0-flash and broke the day it was retired; the model is
+  /// now resolved from the live list at runtime.
+  static String get configuredGeminiModel => _read('GEMINI_MODEL');
+
+  /// For display only — what is pinned, or "auto".
+  static String get geminiModel {
+    final pinned = configuredGeminiModel;
+    return pinned.isEmpty ? 'auto' : pinned;
+  }
 
   static String get geminiEmbeddingModel =>
       _read('GEMINI_EMBEDDING_MODEL', fallback: 'text-embedding-004');

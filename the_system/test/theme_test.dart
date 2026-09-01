@@ -3,15 +3,23 @@ import 'dart:math' as math;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:the_system/ai/ai_log_repository.dart';
 import 'package:the_system/data/db/database.dart';
 import 'package:the_system/data/export/export_repository.dart';
 import 'package:the_system/data/repositories/activity_repository.dart';
 import 'package:the_system/data/repositories/player_repository.dart';
 import 'package:the_system/data/memory/memory_repository.dart';
+import 'package:the_system/data/repositories/nutrition_repository.dart';
+import 'package:the_system/data/alerts/notifier.dart';
+import 'package:the_system/data/repositories/alert_repository.dart';
+import 'package:the_system/data/repositories/progress_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
 import 'package:the_system/data/repositories/workout_repository.dart';
 import 'package:the_system/game/game.dart';
 import 'package:the_system/main.dart';
+import 'package:the_system/screens/badge_gallery_screen.dart';
+import 'package:the_system/screens/nav_hub.dart';
+import 'package:the_system/widgets/system_panel.dart';
 import 'package:the_system/theme/theme.dart';
 import 'package:the_system/widgets/theme_toggle_button.dart';
 
@@ -116,6 +124,13 @@ void main() {
       exportRepository: ExportRepository(db),
       workoutRepository: WorkoutRepository(db, clock: FixedClock.todayAt(21, 30)),
       memoryRepository: MemoryRepository(db),
+      aiLogRepository: AiLogRepository(db),
+      nutritionRepository: NutritionRepository(db, clock: FixedClock.todayAt(21, 30)),
+      progressRepository: ProgressRepository(db),
+      alertRepository: AlertRepository(
+        quests: QuestRepository(db),
+        notifier: NoopNotifier(),
+      ),
       initialThemeMode: mode,
     );
 
@@ -181,6 +196,73 @@ void main() {
       expect(find.text('PRINCE'), findsOneWidget);
       expect(find.text('DAILY QUESTS'), findsWidgets);
       expect(AppColors.palette.isDark, isFalse);
+
+      await disposeTree(tester);
+    });
+
+    testWidgets('a screen with no live stream still repaints on a flip', (
+      WidgetTester tester,
+    ) async {
+      // The regression: MaterialApp's `home` is captured by the Navigator when
+      // the first route is pushed, so rebuilding MaterialApp with a new theme
+      // never reached the screens. Streaming screens corrected themselves on
+      // the next emission and looked fine; the badge gallery is entirely
+      // static and kept the old palette — a light panel on a dark app.
+      tester.view.physicalSize = const Size(420 * 3, 1900 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(app(AppThemeMode.dark));
+      await settle(tester);
+
+      // Onto the most static screen in the app.
+      await tester.tap(find.bySemanticsLabel('Open navigation hub'));
+      await settle(tester);
+      await tester.tap(
+        find.descendant(of: find.byType(NavHub), matching: find.text('BADGES')),
+      );
+      await settle(tester);
+      expect(find.byType(BadgeGalleryScreen), findsOneWidget);
+
+      // The panel's own fill, which is the thing that stayed light.
+      Color panelFill() {
+        final panel = tester.widget<DecoratedBox>(
+          find
+              .descendant(
+                of: find.byType(SystemPanel),
+                matching: find.byType(DecoratedBox),
+              )
+              .first,
+        );
+        return (panel.decoration as ShapeDecoration).color!;
+      }
+
+      final inDark = panelFill();
+
+      await tester.tap(find.byType(ThemeToggleButton));
+      await settle(tester);
+      final inWarm = panelFill();
+      expect(
+        inWarm,
+        isNot(inDark),
+        reason: 'the static screen did not repaint when the theme changed',
+      );
+      expect(inWarm, AppPalette.warm.panelFill);
+
+      // And back again — the half that used to stay stuck.
+      // Settling BETWEEN the taps matters: the button computes the next mode
+      // from the one it was built with, so two taps in the same frame both
+      // read "warm" and land on AUTO rather than stepping through to dark.
+      await tester.tap(find.byType(ThemeToggleButton)); // warm -> auto
+      await settle(tester);
+      await tester.tap(find.byType(ThemeToggleButton)); // auto -> dark
+      await settle(tester);
+      expect(find.text('DARK'), findsOneWidget);
+      expect(
+        panelFill(),
+        inDark,
+        reason: 'flipping back left the old palette behind',
+      );
 
       await disposeTree(tester);
     });

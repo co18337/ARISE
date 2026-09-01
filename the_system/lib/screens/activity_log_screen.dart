@@ -36,7 +36,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           children: [
-            const HudSectionTitle('ACTIVITY LOG'),
+            HudSectionTitle('ACTIVITY LOG'),
             const SizedBox(height: 18),
             if (entries == null)
               const Center(child: CircularProgressIndicator())

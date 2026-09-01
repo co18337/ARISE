@@ -1,0 +1,24 @@
+<!-- The notification small icon.
+
+     Android draws this as a SILHOUETTE: every non-transparent pixel is
+     repainted white (or the accent colour) and everything else is dropped.
+     Handing it the launcher icon — which is what the app did until now — gets
+     you a solid grey blob in the status bar, because the whole square is
+     opaque. So this is a flat white shape with no colour, no gradient and no
+     background, which is the only thing that survives the treatment.
+
+     The shape is the crest's arrow, the one element of the logo still legible
+     at 24dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Upward arrow: head, then shaft. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2 L19,11 L14.5,11 L14.5,13 L9.5,13 L9.5,11 L5,11 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.2,14.2 L13.8,14.2 L13.8,20 L12,22.5 L10.2,20 Z" />
+</vector>

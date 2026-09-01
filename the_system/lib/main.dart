@@ -1,6 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'ai/ai_log_repository.dart';
+import 'ai/gemini_client.dart';
+import 'ai/lanes/nutrition_lane.dart';
+import 'ai/lanes/trainer_lane.dart';
 import 'config/app_config.dart';
 import 'data/db/database.dart';
 import 'data/exercise_guides.dart';
@@ -10,6 +14,10 @@ import 'data/repositories/player_repository.dart';
 import 'data/repositories/quest_repository.dart';
 import 'data/memory/memory_repository.dart';
 import 'data/memory/memory_trainer.dart';
+import 'data/repositories/nutrition_repository.dart';
+import 'data/alerts/notifier_factory.dart';
+import 'data/repositories/alert_repository.dart';
+import 'data/repositories/progress_repository.dart';
 import 'data/repositories/workout_repository.dart';
 import 'screens/app_shell.dart';
 import 'theme/theme.dart';
@@ -35,6 +43,12 @@ Future<void> main() async {
     // One memory store, shared: the trainer reads from it and finished
     // sessions write to it, which is the loop that fills it.
     final memory = MemoryRepository(database);
+    // One client, shared by every lane. The nutrition lane is only attached
+    // when a key exists — without one the app logs food and takes the figures
+    // by hand, which is the whole offline path.
+    final gemini = GeminiClient(database);
+    final nutritionLane = AppConfig.hasGeminiKey ? NutritionLane(gemini) : null;
+    final trainerLane = AppConfig.hasGeminiKey ? TrainerLane(gemini) : null;
     runApp(
       MyApp(
         questRepository: QuestRepository(database),
@@ -43,10 +57,24 @@ Future<void> main() async {
         exportRepository: ExportRepository(database),
         workoutRepository: WorkoutRepository(
           database,
-          advisor: MemoryTrainerAdvisor(memory: memory),
+          advisor: MemoryTrainerAdvisor(memory: memory, lane: trainerLane),
           memory: memory,
         ),
         memoryRepository: memory,
+        aiLogRepository: AiLogRepository(database),
+        nutritionRepository: NutritionRepository(
+          database,
+          memory: memory,
+          lane: nutritionLane,
+        ),
+        progressRepository: ProgressRepository(database),
+        // The notifier is chosen by the compiler, not at runtime: the plugin
+        // does not exist on web, so a conditional export picks the no-op
+        // there. Nothing here can fail the launch.
+        alertRepository: AlertRepository(
+          quests: QuestRepository(database),
+          notifier: createNotifier(),
+        ),
       ),
     );
   } catch (error, stackTrace) {
@@ -84,6 +112,10 @@ class MyApp extends StatefulWidget {
   final ExportRepository exportRepository;
   final WorkoutRepository workoutRepository;
   final MemoryRepository memoryRepository;
+  final AiLogRepository aiLogRepository;
+  final NutritionRepository nutritionRepository;
+  final ProgressRepository progressRepository;
+  final AlertRepository alertRepository;
 
   /// Starting look. Tests pin it; the real app loads the saved one instead.
   final AppThemeMode? initialThemeMode;
@@ -96,6 +128,10 @@ class MyApp extends StatefulWidget {
     required this.exportRepository,
     required this.workoutRepository,
     required this.memoryRepository,
+    required this.aiLogRepository,
+    required this.nutritionRepository,
+    required this.progressRepository,
+    required this.alertRepository,
     this.initialThemeMode,
   });
 
@@ -109,10 +145,23 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late AppThemeMode _mode = widget.initialThemeMode ?? AppThemeMode.dark;
 
+  /// The palette the current mode resolves to right now.
+  ///
+  /// Read from the platform dispatcher rather than MediaQuery so it can be
+  /// resolved OUTSIDE build — installing the palette during a build meant the
+  /// notifier fired mid-frame and the screens never repainted.
+  AppPalette get _palette => AppTheme.paletteFor(
+    _mode,
+    WidgetsBinding.instance.platformDispatcher.platformBrightness,
+  );
+
+  void _applyPalette() => AppColors.use(_palette);
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _applyPalette();
     if (widget.initialThemeMode == null) _loadSavedMode();
   }
 
@@ -124,18 +173,26 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Future<void> _loadSavedMode() async {
     final saved = await widget.playerRepository.readThemeMode();
-    if (mounted && saved != _mode) setState(() => _mode = saved);
+    if (mounted && saved != _mode) {
+      setState(() {
+        _mode = saved;
+        _applyPalette();
+      });
+    }
   }
 
   @override
   void didChangePlatformBrightness() {
     // Only AUTO cares, but rebuilding either way is a single frame and keeps
     // the condition out of a lifecycle callback.
-    if (mounted) setState(() {});
+    if (mounted) setState(_applyPalette);
   }
 
   void _setMode(AppThemeMode mode) {
-    setState(() => _mode = mode);
+    setState(() {
+      _mode = mode;
+      _applyPalette();
+    });
     // Fire and forget: the UI has already changed, and a failed write costs
     // nothing worse than the app opening in the previous theme next time.
     widget.playerRepository.setThemeMode(mode);
@@ -143,12 +200,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final platform = MediaQuery.platformBrightnessOf(context);
-
     return MaterialApp(
-      title: 'The System',
+      // The app is ARISE; the entity inside it is "The System", which is what
+      // the headings and the notifications say. This title is what Android
+      // shows in the recents switcher, so it matches the launcher.
+      title: 'ARISE',
       debugShowCheckedModeBanner: false, // the red banner breaks the HUD look
-      theme: AppTheme.build(AppTheme.paletteFor(_mode, platform)),
+      theme: AppTheme.build(_palette),
       // Repositories are passed by constructor down to AppShell, which hands
       // each screen only what it needs. Still no DI package: one hop is not
       // worth the indirection, and the shell is the only place that knows
@@ -160,6 +218,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         exportRepository: widget.exportRepository,
         workoutRepository: widget.workoutRepository,
         memoryRepository: widget.memoryRepository,
+        aiLogRepository: widget.aiLogRepository,
+        nutritionRepository: widget.nutritionRepository,
+        progressRepository: widget.progressRepository,
+        alertRepository: widget.alertRepository,
         themeMode: _mode,
         onThemeModeChanged: _setMode,
       ),

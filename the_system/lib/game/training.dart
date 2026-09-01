@@ -8,6 +8,24 @@
 library;
 
 import '../models/models.dart';
+import 'body_emphasis.dart';
+
+/// Who wrote the note above today's session.
+enum TrainerNoteSource {
+  /// No note at all.
+  none('', ''),
+
+  /// Passages lifted straight out of the corpus. True, but not written.
+  history('THE SYSTEM REMEMBERS', 'from your own record'),
+
+  /// Written by the model from those same passages.
+  model('YOUR TRAINER SAYS', 'written from your record');
+
+  final String heading;
+  final String caption;
+
+  const TrainerNoteSource(this.heading, this.caption);
+}
 
 /// The stages of the programme.
 ///
@@ -16,38 +34,40 @@ import '../models/models.dart';
 /// stays fat-loss dominant for three months, and only then begins loading the
 /// lifts — rather than starting with a generic full-body split.
 enum TrainingPhase {
-  /// Month one. Running and walking, nothing else. The point is to build the
-  /// habit of turning up daily before anything technical is asked.
-  ignite(
-    label: 'IGNITE',
+  /// Weeks 1-4. Endurance base and turning up. Nothing heavy, nothing fast.
+  reset(
+    label: 'RESET',
     startWeek: 1,
     endWeek: 4,
-    focus: 'Cardio only — build the habit',
+    focus: 'Base, sleep, and turning up',
+    benchmark: 'Run 20 minutes without stopping · hang 30 seconds',
   ),
 
-  /// Months two and three. Cardio still leads; core and bodyweight pushing
-  /// join it.
-  reduce(
-    label: 'REDUCE',
+  /// Weeks 5-16. The five-day split, sprints, and the lifts get real.
+  fatBurn(
+    label: 'FAT BURN',
     startWeek: 5,
-    endWeek: 12,
-    focus: 'Fat loss, with core and push',
+    endWeek: 16,
+    focus: 'Fat loss leads, strength enters',
+    benchmark: 'Run 5 km · 15 push-ups · 3 negative pull-ups',
   ),
 
-  /// Months four to six. Pulling and legs arrive; the lifts get real.
-  build(
-    label: 'BUILD',
-    startWeek: 13,
-    endWeek: 24,
-    focus: 'Compound strength enters',
+  /// Weeks 17-36. Muscle and recomposition. The first pull-up lands here.
+  buildSculpt(
+    label: 'BUILD & SCULPT',
+    startWeek: 17,
+    endWeek: 36,
+    focus: 'Muscle, trunk, recomposition',
+    benchmark: 'First full pull-up · 30 push-ups',
   ),
 
-  /// Everything after. The full programme, driven by progressive overload.
-  forge(
-    label: 'FORGE',
-    startWeek: 25,
+  /// Week 37 on. The full programme, driven by overload.
+  sharpen(
+    label: 'SHARPEN',
+    startWeek: 37,
     endWeek: null,
-    focus: 'Full programme, progressive overload',
+    focus: 'Advanced physique, maintenance',
+    benchmark: '5 km under 30 minutes · 50 push-ups · 12 pull-ups',
   );
 
   final String label;
@@ -58,25 +78,119 @@ enum TrainingPhase {
 
   final String focus;
 
+  /// What leaving this phase is supposed to look like, in plain words.
+  ///
+  /// Shown, not enforced by itself — [PhaseGate] is what enforces it. Stated
+  /// because a phase you cannot see the end of is one you stop believing in.
+  final String benchmark;
+
   const TrainingPhase({
     required this.label,
     required this.startWeek,
     required this.endWeek,
     required this.focus,
+    required this.benchmark,
   });
 
-  /// The phase for a given programme week, counting from week 1.
+  /// The phase a given programme WEEK allows, counting from week 1.
+  ///
+  /// The week is a FLOOR, not a promotion. What you actually train is decided
+  /// by [PhaseGate.reached], which also requires the work to have been done —
+  /// see the note there for why the calendar alone is the wrong trigger.
   static TrainingPhase forWeek(int week) {
     final w = week < 1 ? 1 : week;
     for (final phase in TrainingPhase.values.reversed) {
       if (w >= phase.startWeek) return phase;
     }
-    return TrainingPhase.ignite;
+    return TrainingPhase.reset;
   }
 
   TrainingPhase? get next {
     final i = index + 1;
     return i < TrainingPhase.values.length ? TrainingPhase.values[i] : null;
+  }
+
+  /// Sessions that must be completed IN FULL before this phase is earned.
+  ///
+  /// Roughly two-thirds of the sessions the phase before it offers — six
+  /// training days a week, minus the ones real life takes. Missing a third of
+  /// your sessions and still advancing is how week 5 becomes an injury.
+  int get sessionsRequired => switch (this) {
+    TrainingPhase.reset => 0,
+    TrainingPhase.fatBurn => 16,
+    TrainingPhase.buildSculpt => 64,
+    TrainingPhase.sharpen => 160,
+  };
+}
+
+/// Whether a phase has actually been earned, and what is still missing.
+///
+/// The engine used to advance on the calendar alone: week 5 arrived and the
+/// programme handed over a five-day split whether or not you could jog for
+/// twenty minutes. For somebody starting at three push-ups that is precisely
+/// how week five becomes an injury or a quit.
+///
+/// So a phase now needs BOTH — the weeks to have passed AND the sessions to
+/// have been done. Time alone cannot promote you, and neither can volume: a
+/// fortnight of heroics does not compress a four-week base.
+class PhaseGate {
+  /// The phase the calendar would allow on its own.
+  final TrainingPhase byCalendar;
+
+  /// The phase actually earned.
+  final TrainingPhase reached;
+
+  /// Sessions completed in full, ever.
+  final int sessionsDone;
+
+  const PhaseGate({
+    required this.byCalendar,
+    required this.reached,
+    required this.sessionsDone,
+  });
+
+  /// True when the weeks have passed but the work has not been done.
+  bool get isHeldBack => byCalendar.index > reached.index;
+
+  /// How many more full sessions the next phase needs, or zero.
+  int get sessionsRemaining {
+    final next = reached.next;
+    if (next == null) return 0;
+    final short = next.sessionsRequired - sessionsDone;
+    return short < 0 ? 0 : short;
+  }
+
+  /// One line for the session card, or null when nothing is being held back.
+  String? get holdReason {
+    if (!isHeldBack) return null;
+    final missing = sessionsRemaining;
+    return missing <= 0
+        ? null
+        : 'Still on ${reached.label}: $missing more completed '
+              '${missing == 1 ? 'session' : 'sessions'} to earn '
+              '${reached.next?.label ?? ''}.';
+  }
+
+  /// Resolves the phase from the calendar and the record together.
+  static PhaseGate resolve({
+    required int week,
+    required int sessionsCompleted,
+  }) {
+    final byCalendar = TrainingPhase.forWeek(week);
+
+    var reached = TrainingPhase.reset;
+    for (final phase in TrainingPhase.values) {
+      final earned =
+          week >= phase.startWeek &&
+          sessionsCompleted >= phase.sessionsRequired;
+      if (earned) reached = phase;
+    }
+
+    return PhaseGate(
+      byCalendar: byCalendar,
+      reached: reached,
+      sessionsDone: sessionsCompleted,
+    );
   }
 }
 
@@ -123,18 +237,29 @@ class SetPrescription {
 ///
 /// Sets stop at two above the starting count. Past that the answer is a harder
 /// exercise, not a longer session, and the phase plan is what supplies one.
-SetPrescription prescribeFor(Exercise exercise, {required int clearedSessions}) {
+SetPrescription prescribeFor(
+  Exercise exercise, {
+  required int clearedSessions,
+  /// Extra sets earned by [BodyEmphasis] — 0 or 1. Applied on top of the
+  /// double-progression result rather than folded into it, so the emphasis
+  /// can change between scans without disturbing the overload history.
+  int extraSets = 0,
+}) {
   final cleared = clearedSessions < 0 ? 0 : clearedSessions;
 
   final span = exercise.targetCeiling - exercise.startTarget;
   final maxTargetSteps = exercise.step <= 0 ? 0 : span ~/ exercise.step;
 
   final targetSteps = cleared < maxTargetSteps ? cleared : maxTargetSteps;
-  final extraSets = cleared - maxTargetSteps;
+
+  final earnedSets = cleared - maxTargetSteps;
+  final progressionSets = earnedSets <= 0 ? 0 : (earnedSets > 2 ? 2 : earnedSets);
 
   return SetPrescription(
     exercise: exercise,
-    sets: exercise.startSets + (extraSets <= 0 ? 0 : (extraSets > 2 ? 2 : extraSets)),
+    sets: exercise.startSets +
+        progressionSets +
+        (extraSets < 0 ? 0 : (extraSets > 1 ? 1 : extraSets)),
     target: exercise.startTarget + targetSteps * exercise.step,
   );
 }
@@ -156,13 +281,34 @@ class SessionPlan {
   /// fetched by the screen so every advisor answers the same question.
   final List<String> notes;
 
+  /// Where [notes] came from. Shown on screen, because a note the model wrote
+  /// and a passage copied out of your history deserve different trust.
+  final TrainerNoteSource noteSource;
+
+  /// Why this phase and not the next one. Null when nothing is being held
+  /// back, which is the normal case.
+  final PhaseGate? gate;
+
+  /// One line saying which regions the last scan put the extra work into.
+  final String? emphasisReason;
+
   const SessionPlan({
     required this.phase,
     required this.week,
     required this.focus,
     required this.items,
     this.notes = const [],
+    this.noteSource = TrainerNoteSource.none,
+    this.gate,
+    this.emphasisReason,
   });
+
+  /// A plain-language description of today, for the trainer to comment on.
+  String get summary => [
+    '$focus session, ${phase.label} phase, week $week.',
+    for (final item in items)
+      '${item.exercise.name}: ${item.summary}.',
+  ].join('\n');
 
   bool get isRestDay => items.isEmpty;
 
@@ -185,5 +331,13 @@ abstract class TrainerAdvisor {
     required int weekday,
     required int week,
     required Map<String, int> clearedByExercise,
+
+    /// Sessions completed in full, ever. Half of what decides the phase — see
+    /// [PhaseGate]. Optional so a caller that does not track it still gets a
+    /// working session rather than a compile error.
+    int sessionsCompleted = 0,
+
+    /// Which regions the last body scan says to favour.
+    BodyEmphasis emphasis = BodyEmphasis.none,
   });
 }

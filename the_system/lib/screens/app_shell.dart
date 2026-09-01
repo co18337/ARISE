@@ -4,7 +4,11 @@ import '../data/export/export_repository.dart';
 import '../data/repositories/activity_repository.dart';
 import '../data/repositories/player_repository.dart';
 import '../data/repositories/quest_repository.dart';
+import '../ai/ai_log_repository.dart';
 import '../data/memory/memory_repository.dart';
+import '../data/repositories/nutrition_repository.dart';
+import '../data/repositories/alert_repository.dart';
+import '../data/repositories/progress_repository.dart';
 import '../data/repositories/workout_repository.dart';
 import '../theme/theme.dart';
 import '../widgets/animated_counter.dart';
@@ -19,6 +23,9 @@ import 'nav_hub.dart';
 import 'reward_overlay.dart';
 import 'status_screen.dart';
 import 'memory_screen.dart';
+import 'alerts_screen.dart';
+import 'nutrition_screen.dart';
+import 'progress_screen.dart';
 import 'training_screen.dart';
 import 'today_screen.dart';
 import 'weekly_report_screen.dart';
@@ -39,6 +46,10 @@ class AppShell extends StatefulWidget {
   final ExportRepository exportRepository;
   final WorkoutRepository workoutRepository;
   final MemoryRepository memoryRepository;
+  final AiLogRepository aiLogRepository;
+  final NutritionRepository nutritionRepository;
+  final ProgressRepository progressRepository;
+  final AlertRepository alertRepository;
 
   /// The look currently in force, and the way to change it. Owned by MyApp,
   /// because switching theme rebuilds everything below it.
@@ -53,6 +64,10 @@ class AppShell extends StatefulWidget {
     required this.exportRepository,
     required this.workoutRepository,
     required this.memoryRepository,
+    required this.aiLogRepository,
+    required this.nutritionRepository,
+    required this.progressRepository,
+    required this.alertRepository,
     required this.themeMode,
     required this.onThemeModeChanged,
   });
@@ -102,17 +117,19 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  Widget _buildSection() {
+  Widget _buildSection(PlayerSnapshot? player) {
     return switch (_section) {
       AppSection.quests => TodayScreen(
         key: const ValueKey('quests'),
         questRepository: widget.questRepository,
         onOpenReport: () => setState(() => _section = AppSection.weeklyReport),
         onOpenTraining: () => setState(() => _section = AppSection.training),
+        onDayOpened: widget.alertRepository.reschedule,
       ),
       AppSection.training => TrainingScreen(
         key: const ValueKey('training'),
         workoutRepository: widget.workoutRepository,
+        player: player,
         // Finishing the session clears the routine's workout step, so the same
         // commitment is never ticked twice. Async and awaited by the screen:
         // this is the call that awards the XP.
@@ -121,9 +138,21 @@ class _AppShellState extends State<AppShell> {
           widget.workoutRepository.clock.now(),
         ),
       ),
+      AppSection.nutrition => NutritionScreen(
+        key: const ValueKey('nutrition'),
+        nutritionRepository: widget.nutritionRepository,
+      ),
       AppSection.status => StatusScreen(
         key: const ValueKey('status'),
         playerRepository: widget.playerRepository,
+      ),
+      AppSection.alerts => AlertsScreen(
+        key: const ValueKey('alerts'),
+        alertRepository: widget.alertRepository,
+      ),
+      AppSection.progress => ProgressScreen(
+        key: const ValueKey('progress'),
+        progressRepository: widget.progressRepository,
       ),
       AppSection.weeklyReport => WeeklyReportScreen(
         key: const ValueKey('report'),
@@ -134,10 +163,16 @@ class _AppShellState extends State<AppShell> {
         activityRepository: widget.activityRepository,
       ),
       // DEV ONLY — see BadgeGalleryScreen.
-      AppSection.badges => const BadgeGalleryScreen(key: ValueKey('badges')),
+      // NOT const. A const widget is canonicalised, so every rebuild produces
+      // the identical instance and Element.updateChild short-circuits without
+      // rebuilding it. This is the only section that takes no repository and
+      // could therefore be const — which is exactly why it was the only screen
+      // that kept the old palette after a theme flip.
+      AppSection.badges => BadgeGalleryScreen(key: const ValueKey('badges')),
       AppSection.memory => MemoryScreen(
         key: const ValueKey('memory'),
         memoryRepository: widget.memoryRepository,
+        aiLogRepository: widget.aiLogRepository,
       ),
       AppSection.backup => BackupScreen(
         // Keyed by nothing else, so leaving and returning rebuilds the export
@@ -150,6 +185,18 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Listening to the palette is what makes a theme flip reach this screen at
+    // all. MaterialApp's `home` is captured by the Navigator when the first
+    // route is pushed, so rebuilding MaterialApp with a new ThemeData does NOT
+    // rebuild anything below it — and every widget here reads the AppColors
+    // globals rather than Theme.of(context), so nothing else would notice.
+    return ValueListenableBuilder<AppPalette>(
+      valueListenable: AppColors.listenable,
+      builder: (context, _, _) => _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     return Scaffold(
       body: HudBackdrop(
         child: SafeArea(
@@ -180,7 +227,7 @@ class _AppShellState extends State<AppShell> {
                   Expanded(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 280),
-                      child: _buildSection(),
+child: _buildSection(player),
                     ),
                   ),
                   _ShellBar(player: player, onOpenHub: _openHub),

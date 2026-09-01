@@ -62,9 +62,18 @@ class StatListPanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    row.value,
-                    style: AppTextStyles.readout.copyWith(color: row.valueColor),
+                  // Flexible, not bare: most values are a number or two, but
+                  // some are text — a model name, a mode — and a long one on a
+                  // 360dp panel overflowed the row rather than shrinking.
+                  Flexible(
+                    child: Text(
+                      row.value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style:
+                          AppTextStyles.readout.copyWith(color: row.valueColor),
+                    ),
                   ),
                 ],
               ),

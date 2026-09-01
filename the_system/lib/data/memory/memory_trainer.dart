@@ -1,3 +1,5 @@
+import '../../ai/ai_result.dart';
+import '../../ai/lanes/trainer_lane.dart';
 import '../../game/game.dart';
 import '../../models/models.dart';
 import '../training_plan.dart';
@@ -10,21 +12,28 @@ import 'memory_repository.dart';
 /// network off. What it adds is the thing a real trainer brings and a lookup
 /// table cannot: "last time you did this, here is what happened".
 ///
-/// This is the retrieval-augmented step with the generation left out. When the
-/// Gemini key arrives, the same recalled passages become the context for a
-/// model that writes the note instead of the template below — the retrieval,
-/// which is the hard half, is already here and already tested.
+/// Two ways of saying it, in order of preference:
+///   1. the model WRITES a note from the recalled passages;
+///   2. failing that, the passages are shown as they are.
+/// The second is the floor and always available. Which one you are reading is
+/// recorded and shown, because a written sentence and a quoted record deserve
+/// different trust.
 class MemoryTrainerAdvisor implements TrainerAdvisor {
   final MemoryRepository memory;
   final TrainerAdvisor base;
 
-  /// How many recalled passages to turn into notes.
+  /// Null until a Gemini key exists. Without it the passages speak for
+  /// themselves, which is worse writing and exactly as true.
+  final TrainerLane? lane;
+
+  /// How many recalled passages to use.
   final int noteCount;
 
   const MemoryTrainerAdvisor({
     required this.memory,
     this.base = const RuleBasedTrainer(),
-    this.noteCount = 2,
+    this.lane,
+    this.noteCount = 3,
   });
 
   @override
@@ -32,17 +41,24 @@ class MemoryTrainerAdvisor implements TrainerAdvisor {
     required int weekday,
     required int week,
     required Map<String, int> clearedByExercise,
+    int sessionsCompleted = 0,
+    BodyEmphasis emphasis = BodyEmphasis.none,
   }) async {
+    // Passed straight through. This advisor adds a NOTE; the phase gate and
+    // the scan emphasis decide the numbers, and those belong to the rule
+    // engine so they keep working with the network off.
     final plan = await base.planSession(
       weekday: weekday,
       week: week,
       clearedByExercise: clearedByExercise,
+      sessionsCompleted: sessionsCompleted,
+      emphasis: emphasis,
     );
 
     if (plan.isRestDay) return plan;
 
-    // Query built from what today actually asks for, so the recall is about
-    // this session rather than about training in general.
+    // Built from what today actually asks for, so the recall is about THIS
+    // session rather than about training in general.
     final query = [
       plan.focus,
       for (final item in plan.items) item.exercise.name,
@@ -61,22 +77,61 @@ class MemoryTrainerAdvisor implements TrainerAdvisor {
       return plan;
     }
 
-    if (hits.isEmpty) return plan;
+    final passages = [for (final hit in hits) _passage(hit)];
 
-    return SessionPlan(
-      phase: plan.phase,
-      week: plan.week,
-      focus: plan.focus,
-      items: plan.items,
-      notes: [for (final hit in hits) _noteFrom(hit)],
+    // The written note, if there is a key and it answers.
+    final advisor = lane;
+    if (advisor != null) {
+      final result = await advisor.coach(
+        sessionSummary: plan.summary,
+        recalled: passages,
+      );
+      if (result case AiOk(:final value)) {
+        return _withNotes(
+          plan,
+          [
+            value.note,
+            if (value.basedOn.isNotEmpty) 'Based on: ${value.basedOn}',
+          ],
+          TrainerNoteSource.model,
+        );
+      }
+      // Anything else — no key, offline, over budget, bad shape — falls
+      // through to the passages below rather than showing nothing.
+    }
+
+    if (hits.isEmpty) return plan;
+    return _withNotes(
+      plan,
+      [for (final hit in hits) '${hit.kind.label}: ${_trim(hit.passage)}'],
+      TrainerNoteSource.history,
     );
   }
 
-  /// One recalled passage, trimmed to something readable on a card.
-  String _noteFrom(MemoryHit hit) {
-    final passage = hit.passage.replaceAll('\n', ' ').trim();
-    final trimmed =
-        passage.length <= 150 ? passage : '${passage.substring(0, 147)}…';
-    return '${hit.kind.label}: $trimmed';
+  SessionPlan _withNotes(
+    SessionPlan plan,
+    List<String> notes,
+    TrainerNoteSource source,
+  ) => SessionPlan(
+    phase: plan.phase,
+    week: plan.week,
+    focus: plan.focus,
+    items: plan.items,
+    notes: notes,
+    noteSource: source,
+    // Carried across. Dropping these here is how the gate and the emphasis
+    // would silently vanish the moment a key was added.
+    gate: plan.gate,
+    emphasisReason: plan.emphasisReason,
+  );
+
+  /// A recalled passage, flattened for a prompt.
+  String _passage(MemoryHit hit) =>
+      '${hit.kind.label}: ${hit.passage.replaceAll('\n', ' ').trim()}';
+
+  /// Trimmed to something readable on a card.
+  String _trim(String passage) {
+    final flat = passage.replaceAll('\n', ' ').trim();
+    return flat.length <= 150 ? flat : '${flat.substring(0, 147)}…';
   }
 }

@@ -10,9 +10,12 @@ import '../widgets/hud_overlay_scaffold.dart';
 enum AppSection {
   quests('DAILY QUESTS', Icons.checklist_rtl),
   training('TRAINING', Icons.fitness_center),
+  nutrition('NUTRITION', Icons.restaurant_menu),
   status('STATUS', Icons.insights),
+  progress('PROGRESS', Icons.show_chart),
   weeklyReport('REPORT', Icons.assessment_outlined),
   activityLog('LOG', Icons.forum_outlined),
+  alerts('ALERTS', Icons.notifications_active_outlined),
   memory('MEMORY', Icons.psychology_outlined),
   backup('BACKUP', Icons.save_alt),
 
@@ -45,6 +48,14 @@ class NavHub extends StatelessWidget {
   /// button it sits beneath.
   static const double _cell = 86;
 
+  /// Clear space between neighbouring cells.
+  ///
+  /// Not cosmetic. Sizing the ring so cells exactly touch leaves adjacent tap
+  /// targets sharing an edge, and a Stack hit-tests the LAST child painted at
+  /// that point — so a tap on one destination opened the one after it. That
+  /// shipped at nine destinations and sent TRAINING to STATUS.
+  static const double _gap = 18;
+
   /// Radius that keeps adjacent cells from overlapping.
   ///
   /// The chord between two neighbours on a circle of radius r is
@@ -53,7 +64,7 @@ class NavHub extends StatelessWidget {
   /// buttons on top of each other and taps landed on the wrong screen.
   static double _radiusFor(int count) {
     if (count < 2) return 0;
-    final needed = _cell / (2 * math.sin(math.pi / count));
+    final needed = (_cell + _gap) / (2 * math.sin(math.pi / count));
     return needed < 88 ? 88 : needed;
   }
 
@@ -83,7 +94,7 @@ class NavHub extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const _HubCore(),
+                    _HubCore(),
                     for (var i = 0; i < sections.length; i++)
                       _radialButton(
                         context,

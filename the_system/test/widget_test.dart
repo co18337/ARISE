@@ -1,11 +1,16 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:the_system/ai/ai_log_repository.dart';
 import 'package:the_system/data/db/database.dart';
 import 'package:the_system/data/export/export_repository.dart';
 import 'package:the_system/data/repositories/activity_repository.dart';
 import 'package:the_system/data/repositories/player_repository.dart';
 import 'package:the_system/data/memory/memory_repository.dart';
+import 'package:the_system/data/repositories/nutrition_repository.dart';
+import 'package:the_system/data/alerts/notifier.dart';
+import 'package:the_system/data/repositories/alert_repository.dart';
+import 'package:the_system/data/repositories/progress_repository.dart';
 import 'package:the_system/data/repositories/quest_repository.dart';
 import 'package:the_system/data/repositories/workout_repository.dart';
 import 'package:the_system/game/game.dart';
@@ -41,6 +46,13 @@ void main() {
     exportRepository: ExportRepository(db),
       workoutRepository: WorkoutRepository(db, clock: clock),
       memoryRepository: MemoryRepository(db),
+      aiLogRepository: AiLogRepository(db),
+      nutritionRepository: NutritionRepository(db, clock: clock),
+      progressRepository: ProgressRepository(db),
+      alertRepository: AlertRepository(
+        quests: QuestRepository(db),
+        notifier: NoopNotifier(),
+      ),
   );
 
   /// Pumps enough frames for the FutureBuilder and StreamBuilders to resolve.
@@ -260,6 +272,13 @@ void main() {
         exportRepository: ExportRepository(db),
       workoutRepository: WorkoutRepository(db, clock: clock),
       memoryRepository: MemoryRepository(db),
+      aiLogRepository: AiLogRepository(db),
+      nutritionRepository: NutritionRepository(db, clock: clock),
+      progressRepository: ProgressRepository(db),
+      alertRepository: AlertRepository(
+        quests: QuestRepository(db),
+        notifier: NoopNotifier(),
+      ),
       ),
     );
     await settle(tester);

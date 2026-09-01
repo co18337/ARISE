@@ -103,6 +103,14 @@ class DayRollups extends Table {
   IntColumn get xpAvailable => integer().withDefault(const Constant(0))();
   IntColumn get questsCleared => integer().withDefault(const Constant(0))();
 
+  /// XP earned for training beyond the prescription. Added in schema v13.
+  ///
+  /// Kept SEPARATE from xpEarned on purpose: xpEarned is quest XP and is what
+  /// the streak and the perfect-day bar are measured against. Folding bonus
+  /// work into it would let an extra ten minutes of walking paper over a day
+  /// of missed quests.
+  IntColumn get bonusXp => integer().withDefault(const Constant(0))();
+
   /// Steps that ended the day unanswered or answered as missed. Added in
   /// schema v3 so the weekly report can show misses without rescanning every
   /// quest row.
@@ -149,6 +157,13 @@ class PlayerStates extends Table {
   /// comparing the totals BEFORE a write against the ones after, and "before"
   /// only exists on this row.
   IntColumn get questsCleared => integer().withDefault(const Constant(0))();
+
+  /// Bonus XP is deliberately NOT mirrored here, unlike questsCleared.
+  /// It lives once, on the day rollups, and the lifetime figure is summed
+  /// from them in _recomputeProgression. A second copy on this row was
+  /// declared in v13, never written, never read, and shipped without a
+  /// migration — so every database upgraded to v13 crashed on open. One
+  /// number, one home.
   IntColumn get lastActiveDay => integer().nullable()();
 
   /// Day the training programme began, which is what phase and week are
@@ -210,6 +225,19 @@ class WorkoutSessions extends Table {
   /// rewrite the past.
   TextColumn get notes => text().nullable()();
 
+  /// Whether [notes] were written by the model or copied from the corpus.
+  /// Added in schema v12.
+  TextColumn get noteSource => textEnum<TrainerNoteSource>()
+      .withDefault(const Constant('history'))();
+
+  /// When ARISE was tapped and the session was accepted.
+  ///
+  /// The session EXISTS before this — it is built by the rule engine the
+  /// moment the day opens, so a dead network or a flat battery still leaves
+  /// you a workout. Summoning reveals it and lets the trainer speak; the
+  /// ceremony must never be the thing holding the door shut.
+  DateTimeColumn get summonedAt => dateTime().nullable()();
+
   DateTimeColumn get startedAt => dateTime().nullable()();
   DateTimeColumn get completedAt => dateTime().nullable()();
 
@@ -241,6 +269,14 @@ class WorkoutSets extends Table {
 
   BoolColumn get done => boolean().withDefault(const Constant(false))();
   DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// Work done BEYOND what was prescribed.
+  ///
+  /// Recorded and rewarded, but deliberately excluded from progressive
+  /// overload. Counting six sets as "completed the prescription" would make
+  /// the engine ask for more next week — enthusiasm bootstrapping itself into
+  /// an injury. Extra work is yours; it does not move the ladder.
+  BoolColumn get isExtra => boolean().withDefault(const Constant(false))();
 }
 
 /// A document the System can remember and search — a body scan, the plan, a
@@ -305,4 +341,290 @@ class MemoryChunks extends Table {
   /// is what makes it possible to notice, and to re-embed the corpus when the
   /// embedder changes rather than silently returning nonsense.
   TextColumn get embedder => text()();
+}
+
+/// The meal rotation, seeded from MealCatalog on first run.
+///
+/// A table rather than a constant list for the same reason the task catalog is
+/// one: the plan is DATA, and editing a meal in-app later must survive the
+/// next launch.
+@DataClassName('MealRow')
+class Meals extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get slot => textEnum<MealSlot>()();
+
+  /// Weekdays this meal is served on, 1 = Monday. Empty means every day.
+  TextColumn get daysOfWeek =>
+      text().map(const DaysOfWeekConverter()).withDefault(const Constant(''))();
+
+  IntColumn get kcal => integer()();
+  RealColumn get proteinG => real()();
+  RealColumn get carbsG => real()();
+  RealColumn get fatG => real()();
+  RealColumn get fibreG => real()();
+  TextColumn get detail => text()();
+
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// What was actually eaten, and how much of it.
+///
+/// [portions] is a fraction rather than a boolean because half a dinner is the
+/// normal case, and recording it as "eaten" would quietly overstate the day.
+@DataClassName('MealLogRow')
+class MealLogEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// Integer day number — see lib/data/day_key.dart.
+  IntColumn get day => integer()();
+
+  IntColumn get portions => integer().withDefault(const Constant(100))();
+
+  TextColumn get mealId => text().references(Meals, #id)();
+  DateTimeColumn get loggedAt => dateTime()();
+
+  /// One row per meal per day; logging again updates the portion.
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {day, mealId},
+  ];
+}
+
+/// What was actually eaten, typed in plain words.
+///
+/// The RAW TEXT is the source of truth and is never overwritten. The macros
+/// beside it are a derived cache — estimated by the model, or typed by hand,
+/// or absent. That ordering is deliberate: an estimate that quietly replaced
+/// what you wrote would leave no way to re-run it or check it.
+@DataClassName('FoodLogRow')
+class FoodLogEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// Integer day number — see lib/data/day_key.dart.
+  IntColumn get day => integer()();
+  TextColumn get slot => textEnum<MealSlot>()();
+
+  /// Named `body`, not `text`: a column called `text` makes `text()()` resolve
+  /// to the getter itself rather than drift's builder, and drift fails that by
+  /// silently generating an EMPTY schema.
+  TextColumn get body => text()();
+
+  DateTimeColumn get loggedAt => dateTime()();
+
+  /// Where the macros came from: nothing yet, the model, or typed by hand.
+  TextColumn get macroSource =>
+      textEnum<MacroSource>().withDefault(const Constant('none'))();
+
+  /// The model's own confidence, 0..1. Null when a person typed the numbers.
+  RealColumn get confidence => real().nullable()();
+
+  IntColumn get kcal => integer().nullable()();
+  RealColumn get proteinG => real().nullable()();
+  RealColumn get carbsG => real().nullable()();
+  RealColumn get fatG => real().nullable()();
+  RealColumn get fibreG => real().nullable()();
+
+  /// Per-item breakdown as JSON, so "2 chapatis + tea" can be shown itemised
+  /// rather than as one opaque total.
+  TextColumn get items => text().nullable()();
+
+  /// Why the last analysis failed, if it did. Shown rather than swallowed.
+  TextColumn get analysisError => text().nullable()();
+
+  // Deliberately NO unique key on (day, slot). Eating twice in an afternoon
+  // is normal, and forcing the second snack to overwrite the first — or to be
+  // appended to its text — would lose what actually happened.
+}
+
+/// Every model call, recorded.
+///
+/// Not analytics — diagnostics. The first live call will fail on some detail
+/// of the request shape, and without this the only symptom is a button that
+/// does nothing. It is also what the daily budget counts.
+@DataClassName('AiCallRow')
+class AiCalls extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  DateTimeColumn get at => dateTime()();
+
+  /// Which lane made it: `nutrition`, `trainer`, `embedding`.
+  TextColumn get lane => text()();
+  TextColumn get model => text()();
+
+  BoolColumn get ok => boolean()();
+
+  /// Served from the cache without touching the network.
+  BoolColumn get cached => boolean().withDefault(const Constant(false))();
+
+  IntColumn get durationMs => integer().withDefault(const Constant(0))();
+  IntColumn get promptChars => integer().withDefault(const Constant(0))();
+  IntColumn get responseChars => integer().withDefault(const Constant(0))();
+
+  TextColumn get error => text().nullable()();
+}
+
+/// Answers already given, keyed by what was asked.
+///
+/// The same meal text must not cost a second call — retries become free, and
+/// re-opening the day costs nothing.
+@DataClassName('AiCacheRow')
+class AiCacheEntries extends Table {
+  TextColumn get cacheKey => text()();
+  TextColumn get lane => text()();
+  TextColumn get response => text()();
+  DateTimeColumn get at => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {cacheKey};
+}
+
+/// A body-composition scan. One row per measurement, keyed by the day taken.
+///
+/// DATED ROWS, never a "current measurements" record that gets overwritten.
+/// The six-month re-scan is a second row, and the whole point of the exercise
+/// is the line between them: a table holding only the latest reading can say
+/// where you are and never how far you have come.
+///
+/// The full MC-780 panel, because that is what the machine prints and a
+/// transcription that drops half of it is a transcription you have to redo.
+/// Everything except the weight is nullable — a bathroom scale gives one
+/// number, the Tanita gives twenty, and demanding the full panel would mean
+/// recording neither.
+///
+/// The app CHARTS these. It does not interpret them — no "your visceral fat
+/// is concerning", no targets derived from a formula. That reading belongs to
+/// a doctor, and the same rule governs the blood work in [LabResults].
+@DataClassName('BodyMeasurementRow')
+class BodyMeasurements extends Table {
+  IntColumn get day => integer()();
+
+  /// Minutes after midnight the scan was taken. Body water swings across a
+  /// day, so two scans at different hours are not quite comparable and the
+  /// time is part of the reading rather than trivia.
+  IntColumn get atMinutes => integer().nullable()();
+
+  RealColumn get weightKg => real()();
+  RealColumn get heightCm => real().nullable()();
+  RealColumn get bmi => real().nullable()();
+
+  RealColumn get bodyFatPercent => real().nullable()();
+  RealColumn get fatMassKg => real().nullable()();
+  RealColumn get fatFreeMassKg => real().nullable()();
+  RealColumn get muscleMassKg => real().nullable()();
+
+  /// Skeletal muscle only — a subset of muscle mass, and the one the
+  /// sarcopenic index is built from. Not interchangeable with it.
+  RealColumn get skeletalMuscleKg => real().nullable()();
+  RealColumn get skeletalMusclePercent => real().nullable()();
+
+  RealColumn get boneMassKg => real().nullable()();
+  RealColumn get proteinKg => real().nullable()();
+
+  /// Tanita's visceral fat RATING — a 1-59 index, not kilograms or a percent.
+  IntColumn get visceralFat => integer().nullable()();
+
+  RealColumn get totalBodyWaterKg => real().nullable()();
+  RealColumn get totalBodyWaterPercent => real().nullable()();
+  RealColumn get extracellularWaterKg => real().nullable()();
+  RealColumn get intracellularWaterKg => real().nullable()();
+  RealColumn get ecwOverTbwPercent => real().nullable()();
+
+  IntColumn get bmrKcal => integer().nullable()();
+  IntColumn get bmrKj => integer().nullable()();
+  IntColumn get metabolicAge => integer().nullable()();
+
+  /// Sarcopenic index, kg/m². Skeletal muscle scaled to height.
+  RealColumn get sarcopenicIndex => real().nullable()();
+
+  /// Phase angle in degrees at 50 kHz, and whole-body impedance in ohms.
+  RealColumn get phaseAngleDeg => real().nullable()();
+  IntColumn get impedanceOhm => integer().nullable()();
+
+  /// Where it came from: 'Tanita MC-780', 'bathroom scale', and so on.
+  TextColumn get source => text().withDefault(const Constant(''))();
+
+  TextColumn get note => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {day};
+}
+
+/// One body region of one scan.
+///
+/// Its own table rather than thirty more columns on the scan: the MC-780
+/// prints the same six figures for each of five segments, and a shape that
+/// repeats is a row, not a column name with a prefix. It also means a scale
+/// that reports no segments simply writes no rows.
+@DataClassName('BodySegmentRow')
+class BodySegments extends Table {
+  IntColumn get day => integer()();
+
+  /// trunk / rightArm / leftArm / rightLeg / leftLeg.
+  TextColumn get segment => textEnum<BodySegment>()();
+
+  RealColumn get fatPercent => real().nullable()();
+  RealColumn get fatKg => real().nullable()();
+  RealColumn get muscleKg => real().nullable()();
+  RealColumn get fatFreeMassKg => real().nullable()();
+  RealColumn get otherMassKg => real().nullable()();
+
+  /// Tanita's balance ratings, -4..+4, against its reference population.
+  /// Stored as printed. What they MEAN is not the app's to say.
+  IntColumn get fatRating => integer().nullable()();
+  IntColumn get muscleRating => integer().nullable()();
+
+  /// Composite, not a surrogate id with a unique index beside it.
+  /// insertOnConflictUpdate resolves against the PRIMARY KEY, so an id column
+  /// here would mean a re-import silently appended a second copy of every
+  /// segment instead of correcting the first. The same mistake already cost a
+  /// day on the food log.
+  @override
+  Set<Column> get primaryKey => {day, segment};
+}
+
+/// One line from a lab report.
+///
+/// Long and thin on purpose. A blood panel is a different set of analytes
+/// every time it is run, so a table with a column per test would need a
+/// migration for every new panel; a row per result needs none, and the
+/// reference interval travels WITH the value because ranges differ by lab,
+/// method and age.
+///
+/// [flag] is copied from the report, never computed here. Deciding a number is
+/// high is the interpretation this app does not do.
+@DataClassName('LabResultRow')
+class LabResults extends Table {
+  IntColumn get day => integer()();
+
+  /// Which group it was printed under: LIPID, LIVER, HEMOGRAM, VITALS.
+  TextColumn get panel => text()();
+
+  TextColumn get name => text()();
+
+  /// Null for a text result like ABSENT, which lives in [textValue].
+  RealColumn get value => real().nullable()();
+  TextColumn get textValue => text().nullable()();
+
+  TextColumn get unit => text().withDefault(const Constant(''))();
+
+  RealColumn get refLow => real().nullable()();
+  RealColumn get refHigh => real().nullable()();
+
+  /// The range exactly as printed, for anything the two numbers cannot carry
+  /// ("< 45", "9:1-23:1", "Adult : 17-43").
+  TextColumn get refText => text().withDefault(const Constant(''))();
+
+  /// As flagged on the report: '', 'high', 'low'. Copied, not decided.
+  TextColumn get flag => text().withDefault(const Constant(''))();
+
+  TextColumn get source => text().withDefault(const Constant(''))();
+
+  /// One analyte, one panel, one day: that is the identity of a result, and
+  /// making it the primary key is what lets a corrected transcription
+  /// overwrite rather than accumulate.
+  @override
+  Set<Column> get primaryKey => {day, panel, name};
 }

@@ -181,14 +181,30 @@ class AppPalette {
 class AppColors {
   AppColors._(); // never instantiated — this is just a namespace
 
-  static AppPalette _active = AppPalette.dark;
+  /// Fires when the palette is swapped.
+  ///
+  /// This exists because rebuilding the app is NOT enough on its own.
+  /// MaterialApp's `home` is captured by the Navigator when the initial route
+  /// is pushed, so rebuilding MaterialApp with a new theme never rebuilds the
+  /// screens underneath it. Widgets that read `Theme.of(context)` still update
+  /// — they registered a dependency — but everything in this app reads the
+  /// AppColors globals instead, and a global has no dependents to notify.
+  ///
+  /// The symptom was a screen with no live stream keeping the old palette
+  /// after a flip while the streaming screens quietly corrected themselves:
+  /// the badge gallery stayed light on a dark app. AppShell listens to this
+  /// and rebuilds its subtree, which is what turns a global into something
+  /// the widget tree can actually observe.
+  static final ValueNotifier<AppPalette> listenable =
+      ValueNotifier<AppPalette>(AppPalette.dark);
 
   /// The whole palette, for code that wants to branch on [AppPalette.isDark].
-  static AppPalette get palette => _active;
+  static AppPalette get palette => listenable.value;
 
-  /// Swapped by AppTheme when the mode changes. The caller is responsible for
-  /// rebuilding the tree afterwards.
-  static void use(AppPalette palette) => _active = palette;
+  /// Swapped by AppTheme when the mode changes.
+  static void use(AppPalette palette) => listenable.value = palette;
+
+  static AppPalette get _active => listenable.value;
 
   static Color get background => _active.background;
   static Color get surface => _active.surface;

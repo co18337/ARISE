@@ -67,7 +67,7 @@ class _StatusScreenState extends State<StatusScreen> {
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
                 children: [
-                  const HudSectionTitle('STATUS'),
+                  HudSectionTitle('STATUS'),
                   const SizedBox(height: 18),
                   _ProfileHeader(player: player),
                   const SizedBox(height: 20),

@@ -10,6 +10,7 @@ import 'package:the_system/data/memory/memory_repository.dart';
 import 'package:the_system/data/memory/memory_seeder.dart';
 import 'package:the_system/data/memory/memory_trainer.dart';
 import 'package:the_system/data/repositories/workout_repository.dart';
+import 'package:the_system/data/training_plan.dart';
 import 'package:the_system/game/game.dart';
 import 'package:the_system/models/models.dart';
 
@@ -301,7 +302,55 @@ void main() {
 
       expect(plan.items, isNotEmpty);
       expect(plan.notes, isEmpty);
-      expect(plan.phase, TrainingPhase.ignite);
+      expect(plan.phase, TrainingPhase.reset);
+    });
+
+    test('with no key, the passages are quoted and labelled as such', () async {
+      await memory.ingest(
+        kind: MemoryKind.workoutSession,
+        title: 'Last Monday',
+        // Names what Monday actually prescribes now, so the recall has
+        // something to match on. The corpus is the record of real sessions,
+        // and a fixture that names a movement no longer in the plan tests
+        // nothing.
+        body: 'Easy run: 1 of 1 sets at 12 min — completed.',
+      );
+
+      final plan = await MemoryTrainerAdvisor(memory: memory).planSession(
+        weekday: DateTime.monday,
+        week: 1,
+        clearedByExercise: const {},
+      );
+
+      // The floor: no model, so the record speaks for itself — and the screen
+      // is told which it is reading.
+      expect(plan.noteSource, TrainerNoteSource.history);
+      expect(plan.notes.first, contains('SESSION'));
+    });
+
+    test('an empty corpus says nothing rather than inventing', () async {
+      final plan = await MemoryTrainerAdvisor(memory: memory).planSession(
+        weekday: DateTime.monday,
+        week: 1,
+        clearedByExercise: const {},
+      );
+      expect(plan.notes, isEmpty);
+      expect(plan.noteSource, TrainerNoteSource.none);
+    });
+
+    test('the session summary describes what was prescribed', () async {
+      // This is what the trainer lane is given to comment on, so it has to
+      // name the movements and the phase rather than just the focus.
+      final plan = await const RuleBasedTrainer().planSession(
+        weekday: DateTime.monday,
+        week: 1,
+        clearedByExercise: const {},
+      );
+
+      expect(plan.summary, contains('RESET'));
+      expect(plan.summary, contains('week 1'));
+      expect(plan.summary, contains('Easy run'));
+      expect(plan.summary, contains('min'));
     });
 
     test('history the session is about becomes a note', () async {
@@ -320,8 +369,13 @@ void main() {
 
       expect(plan.notes, isNotEmpty);
       expect(plan.notes.first, contains('SESSION'));
-      // The sets are still the rule engine's, untouched by retrieval.
-      expect(plan.items.first.exercise.id, 'steady_run');
+      // The sets are still the rule engine's, untouched by retrieval. Monday
+      // in RESET opens with the warm-up, then the run.
+      expect(plan.items.first.exercise.id, 'dynamic_warmup');
+      expect(
+        plan.items.map((i) => i.exercise.id),
+        contains('steady_run'),
+      );
     });
 
     test('finishing a session writes it into memory', () async {
@@ -343,9 +397,9 @@ void main() {
       final stats = await memory.stats();
       expect(stats.byKind[MemoryKind.workoutSession], 1);
 
-      final hits = await memory.recall('steady run completed');
+      final hits = await memory.recall('easy run completed');
       expect(hits, isNotEmpty);
-      expect(hits.first.passage, contains('Steady run'));
+      expect(hits.first.passage, contains('Easy run'));
     });
   });
 

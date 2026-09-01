@@ -25,7 +25,28 @@ class QuestRepository {
   /// Drift's `.watch()` returns a Stream that fires whenever a row the query
   /// touches changes. That's why [DailyTask] is immutable and the screen no
   /// longer tracks completion in setState — the database pushes the new list.
-  Stream<List<DailyTask>> watchDay(DateTime date) {
+  /// The day's steps, read once.
+  ///
+  /// Not `watchDay(date).first`. A stream's first value arrives on drift's own
+  /// scheduling, which under flutter_test's fake clock does not arrive at all
+  /// unless something pumps it — a caller that just wants today's list hangs
+  /// forever instead of failing. A one-shot read is also simply the honest
+  /// query for a one-shot question.
+  Future<List<DailyTask>> readDay(DateTime date) =>
+      _dayQuery(date).get().then(_toTasks);
+
+  Stream<List<DailyTask>> watchDay(DateTime date) =>
+      _dayQuery(date).watch().map(_toTasks);
+
+  List<DailyTask> _toTasks(List<TypedResult> rows) => [
+    for (final row in rows)
+      _toDailyTask(
+        row.readTable(db.dailyQuests),
+        row.readTable(db.taskTemplates),
+      ),
+  ];
+
+  JoinedSelectStatement<HasResultSet, dynamic> _dayQuery(DateTime date) {
     final key = dayKeyOf(date);
 
     final query = db.select(db.dailyQuests).join([
@@ -48,16 +69,7 @@ class QuestRepository {
       OrderingTerm.asc(db.taskTemplates.sortOrder),
     ]);
 
-    return query.watch().map(
-      (rows) => rows
-          .map(
-            (row) => _toDailyTask(
-              row.readTable(db.dailyQuests),
-              row.readTable(db.taskTemplates),
-            ),
-          )
-          .toList(),
-    );
+    return query;
   }
 
   /// Brings the database up to date and opens today.
@@ -320,6 +332,7 @@ class QuestRepository {
         .insertOnConflictUpdate(
           DayRollupRow(
             day: day,
+            bonusXp: await _bonusXpFor(day),
             xpEarned: earned,
             xpAvailable: available,
             questsCleared: cleared,
@@ -332,6 +345,28 @@ class QuestRepository {
             recXp: perStat[StatType.rec]!,
           ),
         );
+  }
+
+  /// XP for training beyond the prescription on [day].
+  ///
+  /// Read from workout_sets rather than stored anywhere, so it stays derivable
+  /// the same way every other total is. The rollup is now derivable from
+  /// daily_quests AND workout_sets — still fully re-computable from rows that
+  /// record what actually happened.
+  Future<int> _bonusXpFor(int day) async {
+    final rows = await (db.select(db.workoutSets).join([
+      innerJoin(
+        db.workoutSessions,
+        db.workoutSessions.id.equalsExp(db.workoutSets.sessionId),
+      ),
+    ])..where(
+          db.workoutSessions.day.equals(day) &
+              db.workoutSets.isExtra.equals(true) &
+              db.workoutSets.done.equals(true),
+        ))
+        .get();
+
+    return rows.length * GameRules.xpPerExtraSet;
   }
 
   Future<PlayerStateRow> _playerRow() =>
@@ -357,7 +392,10 @@ class QuestRepository {
     final qualifyingDays = <int>{};
 
     for (final r in rollups) {
-      total += r.xpEarned;
+      // Bonus counts toward the lifetime total but NOT toward the streak bar
+      // below, which is measured on quest XP alone. Ten extra minutes of
+      // walking should not paper over a day of missed quests.
+      total += r.xpEarned + r.bonusXp;
       questsCleared += r.questsCleared;
       str += r.strXp;
       sta += r.staXp;

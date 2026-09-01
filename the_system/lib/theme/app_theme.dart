@@ -7,17 +7,14 @@ import 'app_text_styles.dart';
 class AppTheme {
   AppTheme._();
 
-  /// Builds the Material theme for [palette] — and installs it as the active
-  /// palette first.
+  /// Builds the Material theme for [palette]. PURE — it does not install it.
   ///
-  /// The install is a deliberate side effect. [AppTextStyles] and every widget
-  /// read colours through the AppColors facade rather than through
-  /// `Theme.of(context)`, so the global has to be swapped before anything is
-  /// built with it. Call this from the root and rebuild; see the note in
-  /// app_colors.dart for why it works this way.
+  /// It used to call `AppColors.use()` here, which meant the palette notifier
+  /// fired in the middle of a build. A listener that calls setState during the
+  /// build phase has its rebuild silently deferred or dropped, so the flip
+  /// reached ThemeData and nothing else. Installing the palette belongs in the
+  /// state change that caused it, not in the render of its result.
   static ThemeData build(AppPalette palette) {
-    AppColors.use(palette);
-
     // Start from Material's matching baseline so any widget we haven't
     // explicitly styled still lands on sensible defaults.
     final ThemeData base = palette.isDark

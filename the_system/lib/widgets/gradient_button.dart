@@ -65,11 +65,19 @@ class GradientButton extends StatelessWidget {
                     Icon(icon, size: 18, color: AppColors.background),
                     const SizedBox(width: 8),
                   ],
-                  Text(
-                    label.toUpperCase(),
-                    style: AppTextStyles.panelTitle.copyWith(
-                      color: AppColors.background,
-                      fontSize: 13,
+                  // Flexible + ellipsis: labels here are uppercase with wide
+                  // letter-spacing, and a long one ("Forget cached answers")
+                  // overflowed the row on a 360dp phone.
+                  Flexible(
+                    child: Text(
+                      label.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.panelTitle.copyWith(
+                        color: AppColors.background,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],

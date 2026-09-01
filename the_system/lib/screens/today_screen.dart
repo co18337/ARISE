@@ -36,9 +36,18 @@ class TodayScreen extends StatefulWidget {
   /// the session behind it is the actual exercises.
   final VoidCallback? onOpenTraining;
 
+  /// Re-arms the phone's alerts from the routine.
+  ///
+  /// Returns a Future and IS awaited on answer, so the reminder for a step you
+  /// just ticked is gone before the next frame. A VoidCallback here would drop
+  /// the future silently — the same bug that once made finishing a session
+  /// award no XP.
+  final Future<void> Function()? onDayOpened;
+
   const TodayScreen({
     super.key,
     required this.questRepository,
+    this.onDayOpened,
     this.onOpenReport,
     this.onOpenTraining,
   });
@@ -95,7 +104,14 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
 
   void _openDay() {
     _today = _clock.now();
-    _ready = widget.questRepository.openToday();
+    // CHAINED, not fired alongside. Rescheduling reads the day's steps, so
+    // starting both at once means the planner reads a day that has not been
+    // materialised yet and schedules nothing at all. Measured on the G34:
+    // "[alerts] scheduled 0" at 18:54 with four steps still to come.
+    // It still cannot throw — reschedule() swallows its own failures.
+    _ready = widget.questRepository.openToday().then((_) async {
+      await widget.onDayOpened?.call();
+    });
     _questStream = widget.questRepository.watchDay(_today);
   }
 
@@ -128,6 +144,9 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
 
   Future<void> _answer(DailyTask task, QuestStatus status) async {
     await widget.questRepository.setStatus(task, status);
+    // An answered step must stop nagging. Rescheduling from the routine is
+    // idempotent — stable ids, so it replaces rather than duplicates.
+    await widget.onDayOpened?.call();
     if (!mounted) return;
     setState(() {
       _rewardXp = status == QuestStatus.done ? task.xpAwarded : null;
@@ -150,7 +169,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
               key: const ValueKey('error'),
             ),
             AsyncSnapshot(connectionState: != ConnectionState.done) =>
-              const _Notice('ISSUING QUESTS…', key: ValueKey('loading')),
+              _Notice('ISSUING QUESTS…', key: const ValueKey('loading')),
             _ => KeyedSubtree(
               key: const ValueKey('ready'),
               child: _buildRoutine(),
@@ -166,7 +185,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
       stream: _questStream,
       builder: (context, snapshot) {
         final tasks = snapshot.data;
-        if (tasks == null) return const _Notice('LOADING…');
+        if (tasks == null) return _Notice('LOADING…');
 
         final now = _clock.now();
         final cursor = dayCursor(
@@ -196,7 +215,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
                 parent: AlwaysScrollableScrollPhysics(),
               ),
               children: [
-                const HudSectionTitle('DAILY QUESTS'),
+                HudSectionTitle('DAILY QUESTS'),
                 const SizedBox(height: 12),
                 Center(
                   child: CountdownTimer(

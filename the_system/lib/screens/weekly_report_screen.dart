@@ -86,7 +86,7 @@ class _WeeklyReportScreenState extends State<WeeklyReportScreen> {
                 const SizedBox(height: 14),
                 HudEntrance(index: 2, child: _StatBreakdown(week: week)),
                 const SizedBox(height: 22),
-                const HudSectionTitle('ACHIEVEMENTS'),
+                HudSectionTitle('ACHIEVEMENTS'),
                 const SizedBox(height: 14),
                 HudEntrance(
                   index: 3,

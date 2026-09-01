@@ -76,10 +76,10 @@ class _BackupScreenState extends State<BackupScreen> {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           children: [
-            const HudSectionTitle('BACKUP'),
+            HudSectionTitle('BACKUP'),
             const SizedBox(height: 18),
             if (backup == null)
-              const SystemPanel(
+              SystemPanel(
                 child: Center(child: CircularProgressIndicator()),
               )
             else ...[

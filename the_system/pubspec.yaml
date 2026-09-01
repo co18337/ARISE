@@ -30,6 +30,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Required explicitly since flutter_local_notifications 22 declares web
+  # support: Flutter then generates a web_plugin_registrant that imports this,
+  # and without it the WEB build fails to resolve the package even though the
+  # app never posts a notification in a browser.
+  flutter_web_plugins:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -48,6 +54,19 @@ dependencies:
   flutter_dotenv: ^5.1.0
   # The Gemini REST call. Pure Dart, no platform channels.
   http: ^1.2.0
+  # Stable hashing for the model-response cache key. Dart's own hashCode
+  # carries no cross-run stability guarantee, and a cache that silently stops
+  # matching after an SDK upgrade is very hard to diagnose.
+  crypto: ^3.0.3
+  # Charts for PROGRESS. Pure Dart on a Canvas — no WebView, no bundled
+  # JavaScript, nothing fetched at runtime, so the charts work with the radio
+  # off like the rest of the app. Apache ECharts was the other candidate and is
+  # the better library in the abstract, but it renders inside a WebView: a
+  # second rendering engine with its own fonts and its own idea of a colour
+  # scheme, which would look like a web page pasted into the HUD.
+  fl_chart: ^1.2.0
+  flutter_local_notifications: ^22.3.0
+  timezone: ^0.11.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -60,6 +79,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: ^2.34.5
   build_runner: ^2.16.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -81,6 +101,9 @@ flutter:
     # Exercise demonstration animations. Mostly empty for now — see the README
     # in there; each exercise falls back to its written cue without one.
     - assets/exercises/
+    # The summoning animation. Gitignored (anime footage, local use only), so
+    # it may simply be absent on a fresh clone — SummonGate falls back.
+    - assets/solo-leveling-arise.gif
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -152,3 +175,21 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Launcher icon generation. A DEV tool: it writes the mipmap PNGs and the
+# adaptive-icon XML into android/app/src/main/res once, and takes no part in
+# the build afterwards. Regenerate with:
+#   dart run flutter_launcher_icons
+#
+# The source crest is Prince's own artwork (assets/icon/source_crest.png). The
+# foreground is cropped out of it — the outer neon frame is dropped because a
+# rounded square inside Android's own squircle mask reads as a mistake, and the
+# "S-RANK LEVEL UP" lettering is dropped because it is illegible at 48dp.
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_foreground: "assets/icon/foreground.png"
+  # The app's own background colour, so the icon and the app agree.
+  adaptive_icon_background: "#05070D"
+  min_sdk_android: 21
+  remove_alpha_ios: true

@@ -16,13 +16,21 @@ class WorkoutSetView {
   final int? actual;
   final bool done;
 
+  /// Beyond the prescription — logged and rewarded, but never counted toward
+  /// progressive overload.
+  final bool isExtra;
+
   const WorkoutSetView({
     required this.id,
     required this.setIndex,
     required this.target,
     required this.actual,
     required this.done,
+    this.isExtra = false,
   });
+
+  /// Did more than was asked for.
+  bool get exceeded => done && actual != null && actual! > target;
 }
 
 /// One exercise within a session, with all of its sets.
@@ -32,8 +40,28 @@ class WorkoutExerciseView {
 
   const WorkoutExerciseView({required this.exercise, required this.sets});
 
+  List<WorkoutSetView> get prescribed =>
+      [for (final s in sets) if (!s.isExtra) s];
+  List<WorkoutSetView> get extra => [for (final s in sets) if (s.isExtra) s];
+
   int get setsDone => sets.where((s) => s.done).length;
-  bool get complete => sets.isNotEmpty && setsDone == sets.length;
+
+  /// Complete means the PRESCRIPTION is complete. Extra sets are a bonus, not
+  /// part of the bar.
+  bool get complete =>
+      prescribed.isNotEmpty && prescribed.every((s) => s.done);
+
+  int get extraDone => extra.where((s) => s.done).length;
+
+  /// How much more than asked was actually done, in the exercise's own unit.
+  int get overshoot {
+    var beyond = 0;
+    for (final set in sets) {
+      if (set.actual == null) continue;
+      beyond += set.isExtra ? set.actual! : (set.actual! - set.target);
+    }
+    return beyond < 0 ? 0 : beyond;
+  }
 
   /// The prescription line, e.g. "3 × 12 reps".
   String get summary =>
@@ -51,8 +79,15 @@ class WorkoutSessionView {
   final DateTime? completedAt;
   final List<WorkoutExerciseView> exercises;
 
-  /// What the trainer recalled when this session was issued.
+  /// What the trainer said when this session was issued.
   final List<String> notes;
+
+  /// Whether those notes were written by the model or quoted from the record.
+  final TrainerNoteSource noteSource;
+
+  /// When ARISE was tapped. Null means the session is waiting to be summoned —
+  /// it exists and is visible, but is not yours to start yet.
+  final DateTime? summonedAt;
 
   const WorkoutSessionView({
     required this.id,
@@ -63,15 +98,24 @@ class WorkoutSessionView {
     required this.completedAt,
     required this.exercises,
     this.notes = const [],
+    this.noteSource = TrainerNoteSource.none,
+    this.summonedAt,
   });
+
+  bool get isSummoned => summonedAt != null;
 
   bool get isRestDay => exercises.isEmpty;
   bool get isComplete => completedAt != null;
 
-  int get totalSets => exercises.fold(0, (n, e) => n + e.sets.length);
-  int get setsDone => exercises.fold(0, (n, e) => n + e.setsDone);
+  int get totalSets => exercises.fold(0, (n, e) => n + e.prescribed.length);
+  int get setsDone =>
+      exercises.fold(0, (n, e) => n + e.prescribed.where((s) => s.done).length);
 
-  /// Every set answered — which is what makes the session finishable.
+  /// Sets done beyond the prescription, across the whole session.
+  int get extraSetsDone => exercises.fold(0, (n, e) => n + e.extraDone);
+
+  /// Every PRESCRIBED set answered — which is what makes the session
+  /// finishable. Extra work never stands in for work that was asked for.
   bool get allSetsDone => totalSets > 0 && setsDone == totalSets;
 
   double get fraction => totalSets == 0 ? 0 : setsDone / totalSets;
@@ -148,10 +192,20 @@ class WorkoutRepository {
 
     final startDay = await _programmeStartDay(key);
     final week = programmeWeek(startDay: startDay, day: key);
-    final plan = await advisor.planSession(
+
+    // The RULE engine builds the session, always. No network, no key, no
+    // waiting — so a session exists before anything is summoned and survives
+    // every failure the ceremony can have. summon() is what brings in the
+    // trainer.
+    final plan = await const RuleBasedTrainer().planSession(
       weekday: date.weekday,
       week: week,
       clearedByExercise: await clearedByExercise(before: key),
+      // Both read from the record, both local, both cheap. The phase is what
+      // has been EARNED rather than what the calendar allows, and the
+      // emphasis comes from the last body scan's segment ratings.
+      sessionsCompleted: await completedSessionCount(),
+      emphasis: await readEmphasis(),
     );
 
     if (plan.isRestDay) return null;
@@ -166,6 +220,7 @@ class WorkoutRepository {
               notes: Value(
                 plan.notes.isEmpty ? null : plan.notes.join('\n'),
               ),
+              noteSource: Value(plan.noteSource),
             ),
           );
 
@@ -211,6 +266,144 @@ class WorkoutRepository {
 
     return _toView(session, sets);
   }
+
+  /// Accepts the day's session, and lets the trainer speak.
+  ///
+  /// One summon per day. Re-tapping returns the same session rather than
+  /// generating a new one — otherwise you could reroll until you got an easy
+  /// day, which would quietly destroy the point of accepting it at all.
+  Future<WorkoutSessionView?> summon(DateTime date) async {
+    final key = dayKeyOf(date);
+
+    // Opens the day if nothing has yet. Summoning a day that was never opened
+    // is a perfectly reasonable thing to do — it is the first thing that
+    // happens on a rest-day-then-training-day — and failing on the ordering
+    // would be an implementation detail leaking into the ceremony.
+    var session = await (db.select(db.workoutSessions)
+          ..where((s) => s.day.equals(key)))
+        .getSingleOrNull();
+    if (session == null) {
+      await openSession(date);
+      session = await (db.select(db.workoutSessions)
+            ..where((s) => s.day.equals(key)))
+          .getSingleOrNull();
+    }
+    final row = session;
+    if (row == null) return null; // genuinely a rest day
+    if (row.summonedAt != null) return _readSession(key);
+
+    // The trainer runs HERE, not when the screen opens: this is the one moment
+    // the user is expecting to wait, and a pause during a summoning reads as
+    // the System thinking rather than as a broken list.
+    var notes = <String>[];
+    var source = TrainerNoteSource.none;
+    try {
+      final plan = await advisor.planSession(
+        weekday: date.weekday,
+        week: row.week,
+        clearedByExercise: await clearedByExercise(before: key),
+        sessionsCompleted: await completedSessionCount(),
+        emphasis: await readEmphasis(),
+      );
+      notes = plan.notes;
+      source = plan.noteSource;
+    } catch (_) {
+      // The session is already built and already yours. A trainer that cannot
+      // be reached costs you a sentence, not a workout.
+    }
+
+    await (db.update(db.workoutSessions)..where((s) => s.id.equals(row.id)))
+        .write(
+      WorkoutSessionsCompanion(
+        summonedAt: Value(clock.now()),
+        notes: Value(notes.isEmpty ? null : notes.join('\n')),
+        noteSource: Value(source),
+      ),
+    );
+
+    return _readSession(key);
+  }
+
+  /// Where the programme stands: the phase earned, and what the next one
+  /// still needs.
+  ///
+  /// Derived on read rather than stored. Both halves — the programme week and
+  /// the completed-session count — already live in the database, and a cached
+  /// copy of a derived value is one more thing that can disagree with itself.
+  Future<PhaseGate> readGate(DateTime date) async {
+    final key = dayKeyOf(date);
+    return PhaseGate.resolve(
+      week: programmeWeek(startDay: await _programmeStartDay(key), day: key),
+      sessionsCompleted: await completedSessionCount(),
+    );
+  }
+
+  /// Which regions the most recent body scan says to favour.
+  ///
+  /// Reads the segment ratings off the latest scan and hands them to the pure
+  /// engine. Returns [BodyEmphasis.none] when there is no scan or the scan
+  /// reported no segments — a bathroom scale gives one number, and the answer
+  /// to that is an even programme, not a guess.
+  Future<BodyEmphasis> readEmphasis() async {
+    final latest =
+        await (db.select(db.bodyMeasurements)
+              ..orderBy([(m) => OrderingTerm.desc(m.day)])
+              ..limit(1))
+            .getSingleOrNull();
+    if (latest == null) return BodyEmphasis.none;
+
+    final segments = await (db.select(db.bodySegments)
+          ..where((s) => s.day.equals(latest.day)))
+        .get();
+    if (segments.isEmpty) return BodyEmphasis.none;
+
+    return BodyEmphasis.fromRatings(
+      muscleRatings: {
+        for (final s in segments)
+          if (s.muscleRating != null) s.segment: s.muscleRating!,
+      },
+      fatRatings: {
+        for (final s in segments)
+          if (s.fatRating != null) s.segment: s.fatRating!,
+      },
+    );
+  }
+
+  /// Adds a set beyond the prescription.
+  ///
+  /// Deliberately unlimited. If you have another ten minutes in you, the app's
+  /// job is to record it, not to argue. What it will NOT do is treat it as
+  /// prescription completed — see WorkoutSets.isExtra.
+  Future<void> addExtraSet(int sessionId, String exerciseId) async {
+    final existing = await (db.select(db.workoutSets)
+          ..where(
+            (s) => s.sessionId.equals(sessionId) &
+                s.exerciseId.equals(exerciseId),
+          ))
+        .get();
+    if (existing.isEmpty) return;
+
+    final template = existing.first;
+    final highest =
+        existing.map((s) => s.setIndex).reduce((a, b) => a > b ? a : b);
+
+    await db.into(db.workoutSets).insert(
+          WorkoutSetsCompanion.insert(
+            sessionId: sessionId,
+            exerciseId: exerciseId,
+            orderIndex: template.orderIndex,
+            setIndex: highest + 1,
+            target: template.target,
+            isExtra: const Value(true),
+          ),
+        );
+  }
+
+  /// Removes an extra set. Prescribed sets are not removable — they are the
+  /// plan, and un-asking is not something the app should offer.
+  Future<void> removeExtraSet(int setId) => (db.delete(db.workoutSets)
+        ..where((s) => s.id.equals(setId) & s.isExtra.equals(true)))
+      .go();
 
   /// Ticks or un-ticks one set. [actual] defaults to the target, because the
   /// overwhelmingly common case is doing exactly what was asked.
@@ -263,6 +456,18 @@ class WorkoutRepository {
     );
   }
 
+  /// How many sessions have been finished, ever.
+  ///
+  /// Shown during the summoning. The trainer is thin until there is material
+  /// to reason over, and saying how much there is beats letting it produce
+  /// hollow encouragement for a fortnight while you wonder if it is broken.
+  Future<int> completedSessionCount() async {
+    final rows = await (db.select(db.workoutSessions)
+          ..where((s) => s.completedAt.isNotNull()))
+        .get();
+    return rows.length;
+  }
+
   /// How many past sessions completed each exercise in FULL.
   ///
   /// This is the entire input to progressive overload: an exercise you
@@ -275,7 +480,13 @@ class WorkoutRepository {
         db.workoutSessions,
         db.workoutSessions.id.equalsExp(db.workoutSets.sessionId),
       ),
-    ])..where(db.workoutSessions.day.isSmallerThanValue(before)))
+    ])..where(
+          db.workoutSessions.day.isSmallerThanValue(before) &
+              // Extra sets are excluded from overload. Six sets when three were
+              // asked for is not "completed the prescription three times over",
+              // and treating it that way is how enthusiasm becomes an injury.
+              db.workoutSets.isExtra.equals(false),
+        ))
         .get();
 
     // (day, exerciseId) -> [total, done]
@@ -338,6 +549,8 @@ class WorkoutRepository {
           .split('\n')
           .where((n) => n.trim().isNotEmpty)
           .toList(),
+      noteSource: session.noteSource,
+      summonedAt: session.summonedAt,
       exercises: [
         for (final id in ids)
           if (ExerciseCatalog.byId(id) != null)
@@ -353,6 +566,7 @@ class WorkoutRepository {
                     target: s.target,
                     actual: s.actual,
                     done: s.done,
+                    isExtra: s.isExtra,
                   ),
               ],
             ),

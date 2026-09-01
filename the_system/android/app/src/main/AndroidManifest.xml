@@ -1,8 +1,38 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Phase 9 — the routine's alerts.
+
+         POST_NOTIFICATIONS: Android 13+ refuses to show anything without it,
+         and it must be requested at runtime as well as declared here.
+
+         SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM: the 5:30 wake buzzer is an
+         alarm clock and has to land on the minute. Without these Android
+         batches alerts to save battery, which is fine for "drink water" and
+         useless for waking up. USE_EXACT_ALARM is granted at install for
+         genuine alarm-clock apps; SCHEDULE_EXACT_ALARM is the fallback the
+         user grants in Settings, and the app degrades to inexact alerts if
+         both are refused rather than refusing to work.
+
+         RECEIVE_BOOT_COMPLETED: scheduled alarms do NOT survive a reboot.
+         Without the receiver below, restarting the phone silently cancels
+         every reminder until the app is next opened.
+
+         VIBRATE: the wake alarm.
+
+         ACCESS_NOTIFICATION_POLICY: lets the wake channel ask to bypass Do
+         Not Disturb. Declaring it is not enough — the user grants it in
+         Settings, and Android silently ignores the request otherwise, so the
+         alarm still works either way, just not through DND.  -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+
     <application
-        android:label="the_system"
+        android:label="ARISE"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,6 +55,26 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Re-arms the schedule after a reboot and after an app update.
+             Both wipe pending alarms, and QUICKBOOT_POWERON is the
+             manufacturer variant several Android skins send instead of the
+             standard action. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- Re-posts a notification whose exact alarm fired. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -10,8 +10,12 @@ import 'package:the_system/models/models.dart';
 void main() {
   group('phases', () {
     test('run to the weeks the transformation plan promises', () {
-      // The plan's own four phases and its own boundaries, not invented ones.
-      expect(TrainingPhase.forWeek(1), TrainingPhase.reset);
+      // The plan's own phases and boundaries, with RESET split in two: the
+      // first fortnight is running and stretching, and the gym enters at
+      // week 3. That split is the athlete's own call about his body.
+      expect(TrainingPhase.forWeek(1), TrainingPhase.groundwork);
+      expect(TrainingPhase.forWeek(2), TrainingPhase.groundwork);
+      expect(TrainingPhase.forWeek(3), TrainingPhase.reset);
       expect(TrainingPhase.forWeek(4), TrainingPhase.reset);
       expect(TrainingPhase.forWeek(5), TrainingPhase.fatBurn);
       expect(TrainingPhase.forWeek(16), TrainingPhase.fatBurn);
@@ -22,8 +26,8 @@ void main() {
     });
 
     test('week zero and negative weeks clamp to the first phase', () {
-      expect(TrainingPhase.forWeek(0), TrainingPhase.reset);
-      expect(TrainingPhase.forWeek(-3), TrainingPhase.reset);
+      expect(TrainingPhase.forWeek(0), TrainingPhase.groundwork);
+      expect(TrainingPhase.forWeek(-3), TrainingPhase.groundwork);
     });
 
     test('the programme week counts from day one, not day zero', () {
@@ -42,10 +46,20 @@ void main() {
         ...TrainingPlan.exercisesFor(phase, weekday).map((e) => e.id),
     };
 
-    test('RESET builds an endurance base before anything fast or heavy', () {
-      final ids = idsIn(TrainingPhase.reset);
+    test('GROUNDWORK is running and stretching, with NO gym at all', () {
+      // The athlete's own instruction, and the thing the previous version got
+      // wrong: it put a gym session on the Wednesday of week one.
+      final venues = {
+        for (var weekday = 1; weekday <= 7; weekday++)
+          ...TrainingPlan.exercisesFor(
+            TrainingPhase.groundwork,
+            weekday,
+          ).map((e) => e.venue),
+      };
+      expect(venues, isNot(contains(Venue.gym)),
+          reason: 'week one needs no membership');
 
-      // Endurance first, which is the whole request. Running on three days.
+      final ids = idsIn(TrainingPhase.groundwork);
       expect(ids, contains('steady_run'));
       expect(ids, contains('long_run'));
 
@@ -53,8 +67,22 @@ void main() {
       // Somebody starting at three push-ups has no sprint base to draw on.
       expect(ids, contains('hill_strides'));
       expect(ids, isNot(contains('sprint_interval')));
+    });
 
-      // Movement is learned, not loaded. No barbell in month one.
+    test('RESET introduces the gym on two days, not five', () {
+      final gymDays = [
+        for (var weekday = 1; weekday <= 7; weekday++)
+          if (TrainingPlan.exercisesFor(TrainingPhase.reset, weekday)
+              .any((e) => e.venue == Venue.gym))
+            weekday,
+      ];
+      expect(gymDays, hasLength(2));
+
+      // And running is untouched — it is still what the fat loss turns on.
+      final ids = idsIn(TrainingPhase.reset);
+      expect(ids, contains('steady_run'));
+      expect(ids, contains('long_run'));
+      // Still no barbell in month one.
       expect(ids, isNot(contains('bench_press')));
       expect(ids, isNot(contains('romanian_deadlift')));
     });
@@ -84,7 +112,7 @@ void main() {
       for (final exercise in ExerciseCatalog.all) {
         expect(
           exercise.venue,
-          isIn(const [Venue.gym, Venue.park, Venue.outdoor]),
+          isIn(const [Venue.gym, Venue.home, Venue.park, Venue.outdoor]),
           reason: exercise.id,
         );
         expect(exercise.id.contains('band'), isFalse, reason: exercise.id);
@@ -154,17 +182,18 @@ void main() {
       final gate = PhaseGate.resolve(week: 5, sessionsCompleted: 4);
 
       expect(gate.byCalendar, TrainingPhase.fatBurn);
-      expect(gate.reached, TrainingPhase.reset);
+      expect(gate.reached, TrainingPhase.groundwork);
       expect(gate.isHeldBack, isTrue);
-      expect(gate.holdReason, contains('RESET'));
-      expect(gate.sessionsRemaining, 12);
+      expect(gate.holdReason, contains('GROUNDWORK'));
+      // Eight full sessions earn RESET; four have been done.
+      expect(gate.sessionsRemaining, 4);
     });
 
     test('the work alone cannot promote you either', () {
       // A fortnight of heroics does not compress a four-week base.
       final gate = PhaseGate.resolve(week: 2, sessionsCompleted: 200);
 
-      expect(gate.reached, TrainingPhase.reset);
+      expect(gate.reached, TrainingPhase.groundwork);
       expect(gate.isHeldBack, isFalse, reason: 'the calendar agrees');
     });
 
@@ -188,7 +217,7 @@ void main() {
         sessionsCompleted: 4,
       );
 
-      expect(plan.phase, TrainingPhase.reset);
+      expect(plan.phase, TrainingPhase.groundwork);
       expect(plan.items.map((i) => i.exercise.id), contains('steady_run'));
       expect(plan.items.map((i) => i.exercise.id), isNot(contains('bench_press')));
       expect(plan.gate?.isHeldBack, isTrue);
@@ -343,7 +372,7 @@ void main() {
 
       expect(session, isNotNull);
       expect(session!.week, 1);
-      expect(session.phase, TrainingPhase.reset);
+      expect(session.phase, TrainingPhase.groundwork);
       expect(session.focus, 'EASY MILES');
       // Week 1 Monday: warm up, run, then the neck work and cool-down.
       expect(

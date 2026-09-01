@@ -30,15 +30,47 @@ class TrainingPlan {
 
   /// Weekday 1 = Monday … 7 = Sunday, matching DateTime.weekday.
   static const Map<TrainingPhase, Map<int, DayTemplate>> _byPhase = {
-    // RESET — weeks 1-4. Endurance base and learning the movements.
+    // GROUNDWORK — weeks 1-2. Running, stretching, a floor and a park bar.
     //
-    // No sprinting yet and no barbell yet. Hill strides are the on-ramp to
-    // sprint work: short, uphill, well short of maximum, walk all the way back
-    // down. Somebody at three push-ups has no sprint base, and a hamstring
-    // torn in week two costs more weeks than the strides do.
+    // NOT ONE GYM MOVEMENT. Turning up is the only objective of a first
+    // fortnight, and a body that has not trained in years has no business
+    // under a barbell in week one.
+    //
+    // No sprinting yet either. Hill strides are the on-ramp: short, uphill,
+    // well short of maximum, walk all the way back down. Somebody at three
+    // push-ups has no sprint base, and a hamstring torn in week two costs more
+    // weeks than the strides do.
     //
     // Walking is NOT a session here or anywhere. It survives only as the
     // recovery inside an interval.
+    TrainingPhase.groundwork: {
+      1: DayTemplate('EASY MILES', ['dynamic_warmup', 'steady_run']),
+      2: DayTemplate('STRIDES & HANG', [
+        'dynamic_warmup',
+        'hill_strides',
+        'dead_hang',
+      ]),
+      3: DayTemplate('MOBILITY & CORE', [
+        'dynamic_warmup',
+        'plank',
+        'dead_bug',
+        'side_plank',
+      ]),
+      4: DayTemplate('EASY MILES', ['dynamic_warmup', 'steady_run']),
+      5: DayTemplate('STRIDES & CORE', [
+        'dynamic_warmup',
+        'hill_strides',
+        'plank',
+      ]),
+      6: DayTemplate('LONG EASY', ['dynamic_warmup', 'long_run']),
+      7: DayTemplate.rest,
+    },
+
+    // RESET — weeks 3-4. The gym enters, on two days, light.
+    //
+    // Two days rather than five: the point of these weeks is learning the
+    // movements and letting the body meet load, not training hard. Running is
+    // untouched, because it is still what the fat loss turns on.
     TrainingPhase.reset: {
       1: DayTemplate('EASY MILES', ['dynamic_warmup', 'steady_run']),
       2: DayTemplate('STRIDES & HANG', [
@@ -46,18 +78,18 @@ class TrainingPlan {
         'hill_strides',
         'dead_hang',
       ]),
-      3: DayTemplate('FULL BODY', [
+      3: DayTemplate('FIRST LIFTS', [
         'dynamic_warmup',
         'goblet_squat',
         'incline_pushups',
         'lat_pulldown',
         'plank',
       ]),
-      4: DayTemplate('EASY MILES', ['dynamic_warmup', 'steady_run', 'plank']),
-      5: DayTemplate('STRIDES & TRUNK', [
+      4: DayTemplate('EASY MILES', ['dynamic_warmup', 'steady_run', 'dead_bug']),
+      5: DayTemplate('UPPER & TRUNK', [
         'dynamic_warmup',
-        'hill_strides',
-        'dead_bug',
+        'seated_row',
+        'db_shoulder_press',
         'side_plank',
       ]),
       6: DayTemplate('LONG EASY', ['dynamic_warmup', 'long_run']),

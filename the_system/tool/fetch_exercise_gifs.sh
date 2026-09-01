@@ -30,12 +30,50 @@ inverted_rows:0499:inverted row
 bicep_curls:0294:dumbbell biceps curl
 lunges:3470:forward lunge
 cooldown_stretch:1511:hamstring stretch
+
+# --- Gym movements. Added when the catalog was rebuilt for a gym; the same
+# --- dataset already had them, so no second source and no static stand-ins.
+lat_pulldown:2330:cable lat pulldown full range of motion
+assisted_pullup:0017:assisted pull-up
+seated_row:0861:cable seated row
+face_pull:0233:cable standing rear delt row (with rope)
+db_shoulder_press:0405:dumbbell seated shoulder press
+lat_raise:0334:dumbbell lateral raise
+tricep_pushdown:0201:cable pushdown
+assisted_dips:0009:assisted chest dip (kneeling)
+goblet_squat:1760:dumbbell goblet squat
+leg_press:0739:sled 45 degree leg press
+romanian_deadlift:0085:barbell romanian deadlift
+leg_curl:0599:lever seated leg curl
+calf_raise:0605:lever standing calf raise
+cable_woodchop:0243:cable twist
+farmer_carry:2133:farmers walk
+dead_bug:0276:dead bug
+side_plank:3544:bodyweight incline side plank
 "
+
+# NOT FETCHED, deliberately. The dataset has nothing honest for these, and the
+# rule from the first pass still stands: showing a plank-with-twist for a plank
+# teaches the wrong movement, so they keep the written cue instead.
+#   plank          - only 'front plank with twist', 'plank tap shoulder',
+#                    'power point plank'. Every one adds a second action.
+#   hip_thrust     - only 'resistance band hip thrusts on knees', which is
+#                    neither the equipment nor the position.
+#   dead_hang      - nothing. 'arm slingers hanging' is a different exercise.
+#   chin_tucks     - every 'chin' hit is a chin-UP.
+#   neck_extension - only side stretches, which is a different direction.
+#   dynamic_warmup - only single stretches, not a warm-up sequence.
+#
+# A variation that changes DIFFICULTY or ANGLE is fine (assisted, incline,
+# seated). One that adds a MOVEMENT is not.
 
 echo "Fetching exercise demonstrations into $DEST"
 count=0
 while IFS= read -r line; do
   [ -z "$line" ] && continue
+  # Comments are allowed inside the map, so skip them rather than trying to
+  # fetch a GIF called "# --- Gym movements".
+  case "$line" in \#*) continue ;; esac
   ours="${line%%:*}"
   rest="${line#*:}"
   gif="${rest%%:*}"

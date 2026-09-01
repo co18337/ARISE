@@ -307,7 +307,7 @@ void main() {
     // Week 1 of the programme, and the phase says what it is for.
     expect(inTraining(find.text('WEEK 1')), findsOneWidget);
     expect(
-      inTraining(find.textContaining('RESET')),
+      inTraining(find.textContaining('GROUNDWORK')),
       findsOneWidget,
       reason: 'month one should be the cardio-only phase',
     );

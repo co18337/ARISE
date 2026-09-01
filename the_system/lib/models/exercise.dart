@@ -31,6 +31,14 @@ enum ExerciseKind {
 enum Venue {
   gym('GYM'),
 
+  /// A floor and nothing else. Planks, dead bugs, push-ups, the warm-up and
+  /// the cool-down.
+  ///
+  /// This exists because tagging them `gym` was wrong and had a real
+  /// consequence: week one looked like it needed a membership when every
+  /// movement in it needs a patch of carpet.
+  home('HOME'),
+
   /// The park's pull-up bar, and the ground under it.
   park('PARK'),
 

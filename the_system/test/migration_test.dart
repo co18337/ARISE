@@ -176,7 +176,7 @@ void main() {
     // Week 1 of the programme, because the start day is recorded on first use
     // rather than inferred from data that predates training.
     expect(session.week, 1);
-    expect(session.phase, TrainingPhase.reset);
+    expect(session.phase, TrainingPhase.groundwork);
 
     final player = await (upgraded.select(upgraded.playerStates)
           ..where((p) => p.id.equals(0)))

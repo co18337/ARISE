@@ -34,12 +34,27 @@ enum TrainerNoteSource {
 /// stays fat-loss dominant for three months, and only then begins loading the
 /// lifts — rather than starting with a generic full-body split.
 enum TrainingPhase {
-  /// Weeks 1-4. Endurance base and turning up. Nothing heavy, nothing fast.
+  /// Weeks 1-2. Running, stretching and a floor. NO GYM.
+  ///
+  /// Split out of RESET on the athlete's own instruction: turning up is the
+  /// only objective of a first fortnight, and a body that has not run in years
+  /// has no business under a barbell in week one. It also matches the plan
+  /// document, which asks for "basic movement" — the previous version had a
+  /// gym session on the Wednesday of week one, which was mine, not the plan's.
+  groundwork(
+    label: 'GROUNDWORK',
+    startWeek: 1,
+    endWeek: 2,
+    focus: 'Running and stretching. Nothing else.',
+    benchmark: 'Run 15 minutes without stopping · hold a 30-second plank',
+  ),
+
+  /// Weeks 3-4. The gym enters, on two days, light.
   reset(
     label: 'RESET',
-    startWeek: 1,
+    startWeek: 3,
     endWeek: 4,
-    focus: 'Base, sleep, and turning up',
+    focus: 'The lifts are introduced, lightly',
     benchmark: 'Run 20 minutes without stopping · hang 30 seconds',
   ),
 
@@ -102,7 +117,7 @@ enum TrainingPhase {
     for (final phase in TrainingPhase.values.reversed) {
       if (w >= phase.startWeek) return phase;
     }
-    return TrainingPhase.reset;
+    return TrainingPhase.groundwork;
   }
 
   TrainingPhase? get next {
@@ -116,7 +131,11 @@ enum TrainingPhase {
   /// training days a week, minus the ones real life takes. Missing a third of
   /// your sessions and still advancing is how week 5 becomes an injury.
   int get sessionsRequired => switch (this) {
-    TrainingPhase.reset => 0,
+    TrainingPhase.groundwork => 0,
+    // Roughly two-thirds of what the phase before it offers, at six training
+    // days a week. Two weeks of groundwork offers twelve; eight of them earns
+    // the gym.
+    TrainingPhase.reset => 8,
     TrainingPhase.fatBurn => 16,
     TrainingPhase.buildSculpt => 64,
     TrainingPhase.sharpen => 160,
@@ -178,7 +197,7 @@ class PhaseGate {
   }) {
     final byCalendar = TrainingPhase.forWeek(week);
 
-    var reached = TrainingPhase.reset;
+    var reached = TrainingPhase.groundwork;
     for (final phase in TrainingPhase.values) {
       final earned =
           week >= phase.startWeek &&

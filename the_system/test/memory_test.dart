@@ -302,7 +302,7 @@ void main() {
 
       expect(plan.items, isNotEmpty);
       expect(plan.notes, isEmpty);
-      expect(plan.phase, TrainingPhase.reset);
+      expect(plan.phase, TrainingPhase.groundwork);
     });
 
     test('with no key, the passages are quoted and labelled as such', () async {
@@ -347,7 +347,7 @@ void main() {
         clearedByExercise: const {},
       );
 
-      expect(plan.summary, contains('RESET'));
+      expect(plan.summary, contains('GROUNDWORK'));
       expect(plan.summary, contains('week 1'));
       expect(plan.summary, contains('Easy run'));
       expect(plan.summary, contains('min'));

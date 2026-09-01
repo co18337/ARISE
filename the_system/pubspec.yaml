@@ -72,6 +72,13 @@ dependencies:
   # system-level store other apps sync into, so this picks up the phone's own
   # step counter without asking for a second account anywhere.
   health: ^13.3.2
+  # The Android share sheet, for getting a backup OFF the phone.
+  # Not optional and not cosmetic: the export used to be written into the app's
+  # own documents directory, which Android DELETES on uninstall — so the backup
+  # existed only as long as the thing it was protecting against. Handing the
+  # file to Drive, Gmail or WhatsApp is the only route to durable storage that
+  # does not need a permission Android stopped granting at API 29.
+  share_plus: ^13.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

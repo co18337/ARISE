@@ -70,4 +70,7 @@ assets/solo-leveling-*.gif
 assets/icon/source_crest.png
 assets/icon/crest.png
 
-assets/icons/cropped_badges/
+# assets/icons/cropped_badges/ is deliberately TRACKED. The 33 medal cutouts
+# are small (644K total), the app will not render an achievement without them,
+# and a clone onto another machine with a blank medal case is not the app. The
+# large personal media above stays ignored; these do not.

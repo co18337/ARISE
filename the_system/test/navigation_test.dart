@@ -283,6 +283,35 @@ void main() {
     await disposeTree(tester);
   });
 
+  testWidgets('BACKUP refuses a bad restore before touching anything', (
+    WidgetTester tester,
+  ) async {
+    useTallSurface(tester);
+    await tester.pumpWidget(buildApp());
+    await settle(tester);
+    await navigateTo(tester, 'BACKUP');
+
+    final before = await db.select(db.dailyQuests).get();
+
+    await tester.tap(find.text('PASTE A BACKUP'));
+    await settle(tester);
+    await tester.enterText(find.byType(TextField).last, 'this is not a backup');
+    await tester.tap(find.text('CONTINUE'));
+    await settle(tester);
+
+    // Rejected at the inspect stage, so the confirm dialog never appears and
+    // the current record is still there.
+    expect(find.text('REPLACE EVERYTHING?'), findsNothing);
+    expect(
+      find.textContaining('not valid JSON'),
+      findsOneWidget,
+      reason: 'the reason is shown, not a silent no-op',
+    );
+    expect(await db.select(db.dailyQuests).get(), hasLength(before.length));
+
+    await disposeTree(tester);
+  });
+
   testWidgets('BACKUP builds a real export of the database', (
     WidgetTester tester,
   ) async {
@@ -297,7 +326,16 @@ void main() {
     expect(inBackup(find.text('CONTENTS')), findsOneWidget);
     expect(inBackup(find.text('PREVIEW')), findsOneWidget);
     expect(inBackup(find.text('COPY JSON')), findsOneWidget);
-    expect(inBackup(find.text('SAVE TO FILE')), findsOneWidget);
+    expect(inBackup(find.text('SAVE ON THIS PHONE')), findsOneWidget);
+    // The route that actually survives an uninstall, and the only one that
+    // makes the local file worth keeping honest about.
+    expect(inBackup(find.text('SHARE BACKUP')), findsOneWidget);
+    expect(inBackup(find.text('RESTORE')), findsOneWidget);
+    expect(inBackup(find.text('PASTE A BACKUP')), findsOneWidget);
+    // The whole record is listed, not just the routine — these are the rows a
+    // dead phone costs six months of.
+    expect(inBackup(find.text('Body scans')), findsOneWidget);
+    expect(inBackup(find.text('Training sessions')), findsOneWidget);
     // Real figures and real JSON, not a placeholder. Asserted on content
     // rather than on counts, which shift by one on Saturdays.
     expect(inBackup(find.textContaining('KB')), findsOneWidget);

@@ -1,4 +1,27 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- INTERNET. Declared HERE, in the main manifest, and that location is the
+         whole point.
+
+         `flutter create` puts this permission in src/debug/AndroidManifest.xml
+         and src/profile/AndroidManifest.xml only, because the debug build needs
+         it for hot reload. Those two manifests are NOT merged into a release
+         build. So the app had full network access under `flutter run` and NONE
+         once installed as a release APK — verified by decoding the manifests:
+         app-debug.apk carries INTERNET, app-release.apk did not.
+
+         The damage was silent and lasted a week of real use. Every HTTP call
+         failed at the socket before it ever reached the network, so BOTH keys
+         looked dead at once: no costed meals, no trainer notes, no embeddings,
+         and every lane quietly serving its rule-based fallback while the app
+         looked perfectly healthy and even logged "live trainer and nutrition"
+         on startup. A working key cannot be told apart from a forbidden socket
+         by anything the app prints.
+
+         The fallbacks are still the floor and the app must keep working with no
+         network at all — but it should fail over because the network is absent,
+         not because the app was never allowed to ask.  -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <!-- Phase 9 — the routine's alerts.
 
          POST_NOTIFICATIONS: Android 13+ refuses to show anything without it,

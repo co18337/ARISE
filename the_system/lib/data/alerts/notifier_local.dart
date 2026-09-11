@@ -212,10 +212,22 @@ class LocalNotifier implements Notifier {
           body: alert.body,
           scheduledDate: tz.TZDateTime.from(alert.at, tz.local),
           notificationDetails: _detailsFor(alert),
-          // Exact where allowed and where it matters. Falling back to the
-          // inexact mode rather than refusing: a water reminder that lands
-          // within a few minutes is still a water reminder.
-          androidScheduleMode: alert.kind.isAlarm && exact
+          // Exact for EVERY alert the phone will allow, not just the alarm.
+          //
+          // inexactAllowWhileIdle maps to AlarmManager.setAndAllowWhileIdle,
+          // which Android batches into its Doze maintenance windows and
+          // throttles to roughly one firing per nine minutes per app. That is
+          // not a theoretical cost: measured on the G34 over a week, every
+          // quest reminder arrived about TEN MINUTES after the time the ALERTS
+          // screen promised, while the 5:30 buzzer — the only kind that was
+          // asking for exact — was on time. A step reminder ten minutes late
+          // is a step reminder for the wrong moment.
+          //
+          // The manifest has held SCHEDULE_EXACT_ALARM and USE_EXACT_ALARM all
+          // along; only the wake alarm was spending them. Still falls back to
+          // inexact rather than refusing, for a phone that withholds the
+          // permission: late is better than never.
+          androidScheduleMode: exact
               ? AndroidScheduleMode.exactAllowWhileIdle
               : AndroidScheduleMode.inexactAllowWhileIdle,
           payload: alert.templateId,

@@ -98,6 +98,23 @@ class _AppShellState extends State<AppShell> {
   late final Stream<PlayerSnapshot> _playerStream =
       widget.playerRepository.watch();
 
+  @override
+  void initState() {
+    super.initState();
+    // Health Connect was read ONLY by the button on PROGRESS, so a week of
+    // steps, sleep and resting heart rate sat there unread unless that button
+    // happened to be pressed — and the quests that recorded exercise should
+    // have closed stayed open.
+    //
+    // Fire and forget, and deliberately not awaited: sync() catches its own
+    // failures and reports them in its outcome, so nothing here can delay or
+    // fail the first frame. It also never PROMPTS — asking for permission
+    // stays the button's job, because a permission sheet thrown at somebody
+    // opening the app is how the permission gets refused. Without the grant
+    // this reads as "nothing to read" and costs one no-op.
+    widget.healthRepository.sync();
+  }
+
   /// Shows anything earned but not yet celebrated, then records it as seen.
   ///
   /// Driven off the player stream rather than from the places that grant XP:

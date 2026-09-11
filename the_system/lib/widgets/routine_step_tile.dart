@@ -71,7 +71,7 @@ class RoutineStepTile extends StatelessWidget {
                     child: Text(
                       task.scheduledLabel,
                       style: AppTextStyles.hudLabel.copyWith(
-                        fontSize: 10,
+                        fontSize: 12,
                         letterSpacing: 0.6,
                         color: step.state == RoutineState.missed
                             ? AppColors.danger.withValues(alpha: 0.75)
@@ -107,7 +107,7 @@ class RoutineStepTile extends StatelessWidget {
                           : '—',
                       textAlign: TextAlign.right,
                       style: AppTextStyles.xpBadge.copyWith(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: step.state == RoutineState.done
                             ? AppColors.accentGold
                             : AppColors.textDim,
@@ -193,7 +193,7 @@ class ActiveStepCard extends StatelessWidget {
                   CountdownTimer(
                     target: closesAt!,
                     label: 'CLOSES',
-                    style: AppTextStyles.counter.copyWith(fontSize: 12),
+                    style: AppTextStyles.counter.copyWith(fontSize: 13),
                   ),
               ],
             ),
@@ -295,7 +295,7 @@ class _DetailLink extends StatelessWidget {
               Text(
                 label,
                 style: AppTextStyles.panelTitle.copyWith(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppColors.primary,
                 ),
               ),
@@ -370,7 +370,7 @@ class _AnswerButton extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.panelTitle.copyWith(
-                      fontSize: 12,
+                      fontSize: 13,
                       letterSpacing: 1.5,
                       color: filled ? AppColors.background : color,
                     ),

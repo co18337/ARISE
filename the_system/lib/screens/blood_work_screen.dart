@@ -72,7 +72,7 @@ class BloodWorkScreen extends StatelessWidget {
                         child: Text(
                           'Drawn ${_longDate(view.lastLabDate!)}',
                           style: AppTextStyles.hudLabel.copyWith(
-                            fontSize: 10,
+                            fontSize: 12,
                             color: AppColors.textDim,
                           ),
                         ),
@@ -91,7 +91,7 @@ class BloodWorkScreen extends StatelessWidget {
                               'What any of it means is a conversation with '
                               'your doctor.',
                               style: AppTextStyles.body.copyWith(
-                                fontSize: 11,
+                                fontSize: 12,
                                 height: 1.4,
                                 color: AppColors.textDim,
                               ),
@@ -152,7 +152,7 @@ class LabRow extends StatelessWidget {
             child: Text(
               lab.name,
               style: AppTextStyles.body.copyWith(
-                fontSize: 12,
+                fontSize: 13,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -169,7 +169,7 @@ class LabRow extends StatelessWidget {
                   lab.reading,
                   textAlign: TextAlign.right,
                   style: AppTextStyles.readout.copyWith(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: flagged
                         ? AppColors.accentGold
                         : AppColors.textPrimary,
@@ -180,7 +180,7 @@ class LabRow extends StatelessWidget {
                     lab.refText,
                     textAlign: TextAlign.right,
                     style: AppTextStyles.hudLabel.copyWith(
-                      fontSize: 9,
+                      fontSize: 11,
                       color: AppColors.textDim,
                     ),
                   ),

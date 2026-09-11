@@ -191,7 +191,7 @@ class _IntakePanel extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${day.costedCount} OF ${day.typedCount} COSTED',
-                    style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+                    style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
                   ),
                 ],
               ),
@@ -211,7 +211,7 @@ class _IntakePanel extends StatelessWidget {
               'Some entries have no figures yet, so this total is lower than '
               'what you actually ate.',
               style: AppTextStyles.body.copyWith(
-                fontSize: 11,
+                fontSize: 12,
                 color: AppColors.accentGold,
               ),
             ),
@@ -322,7 +322,7 @@ class _Costed extends StatelessWidget {
               child: Text(
                 '· ${item.quantity} ${item.name} — ${item.kcal} kcal, '
                 '${item.proteinG.round()}g protein',
-                style: AppTextStyles.body.copyWith(fontSize: 11),
+                style: AppTextStyles.body.copyWith(fontSize: 12),
               ),
             ),
         ],
@@ -333,7 +333,7 @@ class _Costed extends StatelessWidget {
           Text(
             'Rough estimate — portions were assumed. Tap FIGURES to correct.',
             style: AppTextStyles.body.copyWith(
-              fontSize: 11,
+              fontSize: 12,
               color: AppColors.accentGold,
             ),
           ),
@@ -354,7 +354,7 @@ class _Figure extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(label, style: AppTextStyles.hudLabel.copyWith(fontSize: 8)),
+      Text(label, style: AppTextStyles.hudLabel.copyWith(fontSize: 11)),
       Text(value, style: AppTextStyles.counter.copyWith(fontSize: 13)),
     ],
   );
@@ -408,7 +408,7 @@ class _SmallButton extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.hudLabel.copyWith(
-                    fontSize: 9,
+                    fontSize: 11,
                     color: enabled ? color : AppColors.textDim,
                   ),
                 ),
@@ -581,7 +581,7 @@ class _AddEntryFormState extends State<_AddEntryForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('WHEN', style: AppTextStyles.hudLabel.copyWith(fontSize: 9)),
+          Text('WHEN', style: AppTextStyles.hudLabel.copyWith(fontSize: 11)),
           const SizedBox(height: 8),
           // Chips rather than a dropdown: every option visible, one tap to
           // change, and no menu to open on a phone.
@@ -598,7 +598,7 @@ class _AddEntryFormState extends State<_AddEntryForm> {
             ],
           ),
           const SizedBox(height: 14),
-          Text('WHAT', style: AppTextStyles.hudLabel.copyWith(fontSize: 9)),
+          Text('WHAT', style: AppTextStyles.hudLabel.copyWith(fontSize: 11)),
           const SizedBox(height: 8),
           TextField(
             controller: _controller,
@@ -675,7 +675,7 @@ class _SlotChip extends StatelessWidget {
           ),
           child: Text(
             slot.label,
-            style: AppTextStyles.hudLabel.copyWith(fontSize: 9, color: color),
+            style: AppTextStyles.hudLabel.copyWith(fontSize: 11, color: color),
           ),
         ),
       ),
@@ -730,7 +730,7 @@ class _EntryCard extends StatelessWidget {
                 ),
                 Text(
                   entry.source.label,
-                  style: AppTextStyles.hudLabel.copyWith(fontSize: 8),
+                  style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
                 ),
                 const SizedBox(width: 6),
                 InkWell(
@@ -761,7 +761,7 @@ class _EntryCard extends StatelessWidget {
               Text(
                 entry.analysisError!,
                 style: AppTextStyles.body.copyWith(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppColors.danger,
                 ),
               ),
@@ -808,7 +808,7 @@ class _EntryCard extends StatelessWidget {
                 'No API key set, so nothing is estimated — type the figures '
                 'yourself, or add a key and restart.',
                 style: AppTextStyles.body.copyWith(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppColors.textDim,
                 ),
               ),
@@ -847,7 +847,7 @@ class _PlanButton extends StatelessWidget {
             Text(
               'THE PLAN',
               style: AppTextStyles.hudLabel.copyWith(
-                fontSize: 10,
+                fontSize: 12,
                 color: AppColors.primary,
               ),
             ),

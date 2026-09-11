@@ -278,7 +278,7 @@ class _AchievementGrid extends StatelessWidget {
           Text(
             '$earned OF ${achievements.length} MEDALS STARTED',
             textAlign: TextAlign.center,
-            style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+            style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
           ),
         ],
       ),
@@ -312,7 +312,7 @@ class _ReviewPanel extends StatelessWidget {
               'Written on Sunday evening, once a week. Open the app after 8pm '
               'on Sunday and it appears here.',
               style: AppTextStyles.body.copyWith(
-                fontSize: 12,
+                fontSize: 13,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -347,7 +347,7 @@ class _ReviewPanel extends StatelessWidget {
                 ? 'Written from your record.'
                 : 'Assembled from the figures — no model answered.',
             style: AppTextStyles.hudLabel.copyWith(
-              fontSize: 9,
+              fontSize: 11,
               color: AppColors.textDim,
             ),
           ),
@@ -372,14 +372,14 @@ class _ReviewLine extends StatelessWidget {
         width: 64,
         child: Text(
           label,
-          style: AppTextStyles.hudLabel.copyWith(fontSize: 9, color: accent),
+          style: AppTextStyles.hudLabel.copyWith(fontSize: 11, color: accent),
         ),
       ),
       // Expanded, or a long sentence overflows the row on a narrow phone.
       Expanded(
         child: Text(
           text,
-          style: AppTextStyles.body.copyWith(fontSize: 12, height: 1.4),
+          style: AppTextStyles.body.copyWith(fontSize: 13, height: 1.4),
         ),
       ),
     ],

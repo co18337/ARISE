@@ -316,7 +316,7 @@ class _ProgressScreenState extends State<ProgressScreen>
           child: Text(
             label,
             style: AppTextStyles.hudLabel.copyWith(
-              fontSize: 10,
+              fontSize: 12,
               color: AppColors.textDim,
             ),
           ),
@@ -648,7 +648,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                       '${view.labs.length} results'
                       '${flagged == 0 ? '' : ' · $flagged outside range'}',
                       style: AppTextStyles.body.copyWith(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -748,7 +748,7 @@ class _ScanHeader extends StatelessWidget {
             'AGAINST THE BASELINE OF '
             '${_ProgressScreenState._longDate(baseline.date)}',
             style: AppTextStyles.hudLabel.copyWith(
-              fontSize: 9,
+              fontSize: 11,
               color: AppColors.textDim,
             ),
           ),
@@ -783,7 +783,7 @@ class _Figure extends StatelessWidget {
         Text(
           label,
           style: AppTextStyles.hudLabel.copyWith(
-            fontSize: 9,
+            fontSize: 11,
             color: AppColors.textDim,
           ),
         ),
@@ -798,7 +798,7 @@ class _Figure extends StatelessWidget {
           Text(
             '${d > 0 ? '+' : ''}${d.toStringAsFixed(1)} $unit',
             style: AppTextStyles.hudLabel.copyWith(
-              fontSize: 10,
+              fontSize: 12,
               color: improved == true ? AppColors.primary : AppColors.danger,
             ),
           ),
@@ -843,7 +843,7 @@ class _SegmentPanel extends StatelessWidget {
                     child: Text(
                       seg.segment.label,
                       style: AppTextStyles.hudLabel.copyWith(
-                        fontSize: 10,
+                        fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -858,7 +858,7 @@ class _SegmentPanel extends StatelessWidget {
                                 '${seg.fatPercent == null ? '' : '  '
                                     '${_ProgressScreenState._trim(seg.fatPercent!)}%'}',
                       style: AppTextStyles.readout.copyWith(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.accentMagenta,
                       ),
                     ),
@@ -870,7 +870,7 @@ class _SegmentPanel extends StatelessWidget {
                           ? '—'
                           : '${_ProgressScreenState._trim(seg.muscleKg!)} kg',
                       style: AppTextStyles.readout.copyWith(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.statStr,
                       ),
                     ),
@@ -899,7 +899,7 @@ class _Head extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text,
     style: AppTextStyles.hudLabel.copyWith(
-      fontSize: 9,
+      fontSize: 11,
       color: AppColors.textDim,
     ),
   );
@@ -948,7 +948,7 @@ class _Footnote extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text,
     style: AppTextStyles.body.copyWith(
-      fontSize: 11,
+      fontSize: 12,
       color: AppColors.textDim,
       height: 1.4,
     ),

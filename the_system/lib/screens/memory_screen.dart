@@ -272,7 +272,7 @@ class _AiPanel extends StatelessWidget {
               'are typed by hand, and the trainer falls back to its own rules. '
               'Add a key to assets/config/.env and restart to turn estimation '
               'on.',
-              style: AppTextStyles.body.copyWith(fontSize: 12),
+              style: AppTextStyles.body.copyWith(fontSize: 13),
             ),
           ),
         ],
@@ -284,7 +284,7 @@ class _AiPanel extends StatelessWidget {
             glow: 0.2,
             child: Text(
               summary.lastError!,
-              style: AppTextStyles.body.copyWith(fontSize: 11),
+              style: AppTextStyles.body.copyWith(fontSize: 12),
             ),
           ),
         ],
@@ -311,12 +311,12 @@ class _AiPanel extends StatelessWidget {
                         Expanded(
                           child: Text(
                             call.cached ? '${call.lane} (remembered)' : call.lane,
-                            style: AppTextStyles.body.copyWith(fontSize: 12),
+                            style: AppTextStyles.body.copyWith(fontSize: 13),
                           ),
                         ),
                         Text(
                           call.cached ? '—' : '${call.durationMs} ms',
-                          style: AppTextStyles.counter.copyWith(fontSize: 11),
+                          style: AppTextStyles.counter.copyWith(fontSize: 12),
                         ),
                       ],
                     ),
@@ -457,7 +457,7 @@ class _HitCard extends StatelessWidget {
                 // cannot see the confidence of is one you cannot debug.
                 Text(
                   hit.score.toStringAsFixed(2),
-                  style: AppTextStyles.counter.copyWith(fontSize: 12),
+                  style: AppTextStyles.counter.copyWith(fontSize: 13),
                 ),
               ],
             ),
@@ -466,7 +466,7 @@ class _HitCard extends StatelessWidget {
               hit.passage,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.body.copyWith(fontSize: 12),
+              style: AppTextStyles.body.copyWith(fontSize: 13),
             ),
           ],
         ),

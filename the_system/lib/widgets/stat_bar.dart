@@ -133,7 +133,7 @@ class _TierLabels extends StatelessWidget {
                         '$t',
                         textAlign: TextAlign.center,
                         style: AppTextStyles.counter.copyWith(
-                          fontSize: 9,
+                          fontSize: 11,
                           color: AppColors.textDim,
                         ),
                       ),

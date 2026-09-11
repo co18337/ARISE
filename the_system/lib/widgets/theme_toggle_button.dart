@@ -59,7 +59,7 @@ class ThemeToggleButton extends StatelessWidget {
                   Text(
                     mode.label,
                     style: AppTextStyles.hudLabel.copyWith(
-                      fontSize: 9,
+                      fontSize: 11,
                       color: AppColors.primary,
                     ),
                   ),

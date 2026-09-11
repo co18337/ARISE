@@ -131,7 +131,7 @@ class _SummonGateState extends State<SummonGate> {
                 'The System is still learning you. Until there is a record to '
                 'read, today comes from the programme alone.',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.body.copyWith(fontSize: 11),
+                style: AppTextStyles.body.copyWith(fontSize: 12),
               ),
             ),
           GradientButton(
@@ -228,7 +228,7 @@ class _StatusLine extends StatelessWidget {
             width: 74,
             child: Text(
               label,
-              style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+              style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
             ),
           ),
           Expanded(

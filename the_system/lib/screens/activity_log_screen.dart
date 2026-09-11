@@ -145,7 +145,7 @@ class _ActivityRow extends StatelessWidget {
             child: Text(
               _time(entry.at),
               style: AppTextStyles.counter.copyWith(
-                fontSize: 11,
+                fontSize: 12,
                 color: AppColors.textDim,
               ),
             ),
@@ -171,7 +171,7 @@ class _ActivityRow extends StatelessWidget {
               children: [
                 Text(entry.title, style: AppTextStyles.questTitle),
                 if (entry.detail != null)
-                  Text(entry.detail!, style: AppTextStyles.body.copyWith(fontSize: 12)),
+                  Text(entry.detail!, style: AppTextStyles.body.copyWith(fontSize: 13)),
               ],
             ),
           ),

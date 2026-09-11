@@ -344,6 +344,28 @@ class ExportRepository {
   /// that survives uninstalling the app. Returns false if it was dismissed.
   Future<bool> share(String json) => shareBackupFile(_fileName(), json);
 
+  /// Takes a dated snapshot, at most once per [every].
+  ///
+  /// There is no server, so this screen is the whole disaster-recovery story —
+  /// and until now all of it depended on remembering to press a button. Losing
+  /// a missed quest costs a day; losing the Tanita scan and the Thyrocare panel
+  /// costs six months.
+  ///
+  /// Rate-limited off the newest existing file rather than off a stored
+  /// timestamp, so there is no state to keep in step with the files and
+  /// deleting them all simply means the next launch takes a fresh one.
+  ///
+  /// Returns the path written, or null when one was taken recently enough (or
+  /// on web, where there is no file system).
+  Future<String?> autoSnapshot({
+    Duration every = const Duration(hours: 20),
+  }) async {
+    final last = await newestSnapshotAt();
+    if (last != null && DateTime.now().difference(last) < every) return null;
+    final backup = await build();
+    return saveRollingSnapshot(_fileName(), backup.json);
+  }
+
   /// Timestamped, because a backup you cannot date is a backup you cannot
   /// choose between.
   static String _fileName() {

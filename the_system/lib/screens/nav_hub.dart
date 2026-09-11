@@ -59,7 +59,14 @@ class NavHub extends StatelessWidget {
   /// A cell is TALLER than it is wide — a circular button with a label under
   /// it. Fixed here so the geometry below is true by construction rather than
   /// by assumption; the layout test measures it on a real screen size.
-  static const double _cellHeight = 106;
+  ///
+  /// 114, not 106. The cell holds a 62px circle, a 7px gap and TWO lines of
+  /// label, and the label grew from 10sp to 12sp when the type floor was
+  /// raised — 106 left the column 94px for 99px of content and every hub test
+  /// failed with a 5px overflow. The room is given to the text rather than the
+  /// size taken back off it, because the whole point of the change was that
+  /// 10sp was too small to read.
+  static const double _cellHeight = 114;
 
   /// The smallest radius at which no two cells overlap.
   ///

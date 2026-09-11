@@ -78,7 +78,7 @@ class ExerciseGuideSheet extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         exercise.cue,
-                        style: AppTextStyles.body.copyWith(fontSize: 12),
+                        style: AppTextStyles.body.copyWith(fontSize: 13),
                       ),
                     ],
                   ),
@@ -104,7 +104,7 @@ class ExerciseGuideSheet extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Instructions from the exercises-dataset project, MIT licensed.',
-                style: AppTextStyles.hudLabel.copyWith(fontSize: 8),
+                style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
               ),
             ],
           ],
@@ -152,7 +152,7 @@ class _Tag extends StatelessWidget {
       ),
       child: Text(
         label.toUpperCase(),
-        style: AppTextStyles.hudLabel.copyWith(fontSize: 9, color: color),
+        style: AppTextStyles.hudLabel.copyWith(fontSize: 11, color: color),
       ),
     );
   }
@@ -184,7 +184,7 @@ class _Step extends StatelessWidget {
           child: Text(
             '$number',
             style: AppTextStyles.counter.copyWith(
-              fontSize: 11,
+              fontSize: 12,
               color: AppColors.primary,
             ),
           ),

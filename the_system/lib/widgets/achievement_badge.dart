@@ -70,7 +70,7 @@ class AchievementBadge extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.hudLabel.copyWith(
                   color: color,
-                  fontSize: 9,
+                  fontSize: 11,
                 ),
               ),
               const SizedBox(height: 5),
@@ -83,7 +83,7 @@ class AchievementBadge extends StatelessWidget {
                     ? 'MAX'
                     : '${progress.value} / ${progress.nextThreshold}',
                 style: AppTextStyles.counter.copyWith(
-                  fontSize: 10,
+                  fontSize: 12,
                   color: progress.isMaxed
                       ? AppColors.accentGold
                       : AppColors.textDim,

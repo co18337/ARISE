@@ -101,18 +101,58 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    // Health Connect was read ONLY by the button on PROGRESS, so a week of
-    // steps, sleep and resting heart rate sat there unread unless that button
-    // happened to be pressed — and the quests that recorded exercise should
-    // have closed stayed open.
-    //
-    // Fire and forget, and deliberately not awaited: sync() catches its own
-    // failures and reports them in its outcome, so nothing here can delay or
-    // fail the first frame. It also never PROMPTS — asking for permission
-    // stays the button's job, because a permission sheet thrown at somebody
-    // opening the app is how the permission gets refused. Without the grant
-    // this reads as "nothing to read" and costs one no-op.
-    widget.healthRepository.sync();
+    // AFTER the first frame, deliberately. Building a backup reads all
+    // eighteen tables, and the routine has to draw before anything optional
+    // gets to touch the database.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _snapshotQuietly());
+  }
+
+  /// Takes an automatic dated backup, at most once a day.
+  ///
+  /// There is no server, so the export screen is the whole disaster-recovery
+  /// story — and every copy of it until now depended on remembering to press a
+  /// button. Losing a missed quest costs a day; losing the Tanita scan and the
+  /// Thyrocare panel costs six months.
+  ///
+  /// This does NOT replace the share sheet, which is still the only route to
+  /// storage that survives uninstalling the app. It guarantees that a recent
+  /// copy EXISTS, on a path reachable over a USB cable without opening the app.
+  ///
+  /// Fire and forget, and swallowed: a backup that cannot be written must never
+  /// interrupt the routine.
+  Future<void> _snapshotQuietly() async {
+    try {
+      await widget.exportRepository.autoSnapshot();
+    } catch (_) {
+      // Deliberately ignored — see above.
+    }
+  }
+
+  /// Reads what the phone recorded, before the routine decides the day.
+  ///
+  /// Health Connect was read ONLY by the button on PROGRESS, so steps, sleep
+  /// and resting heart rate sat unread unless that button happened to be
+  /// pressed. Wiring it here fixes that — but it is wired to run BEFORE the
+  /// day opens rather than alongside it, because openToday closes lapsed steps
+  /// and a closed step cannot be reopened by a later sync.
+  ///
+  /// SEVEN days, not thirty: this sits on the critical path to the first
+  /// frame, and seven covers a week of never opening the app. PROGRESS still
+  /// reads thirty on demand.
+  ///
+  /// Bounded and swallowed. A refused permission, an absent Health Connect or
+  /// a slow read must delay the routine by seconds at worst and never stop it
+  /// opening. It also never PROMPTS — asking for the grant stays the button's
+  /// job, because a permission sheet thrown at somebody opening the app is how
+  /// the permission gets refused.
+  Future<void> _readSensorsBeforeJudgingTheDay() async {
+    try {
+      await widget.healthRepository
+          .sync(days: 7)
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Deliberately ignored — see above.
+    }
   }
 
   /// Shows anything earned but not yet celebrated, then records it as seen.
@@ -151,6 +191,7 @@ class _AppShellState extends State<AppShell> {
         onOpenReport: () => setState(() => _section = AppSection.weeklyReport),
         onOpenTraining: () => setState(() => _section = AppSection.training),
         onDayOpened: widget.alertRepository.reschedule,
+        onBeforeDayOpens: _readSensorsBeforeJudgingTheDay,
       ),
       AppSection.training => TrainingScreen(
         key: const ValueKey('training'),
@@ -281,28 +322,36 @@ class _ShellBar extends StatelessWidget {
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.primaryDim, width: 1)),
       ),
+      // EXPANDED, not natural widths with fixed gaps and a Spacer. Raising the
+      // type floor grew each label by about twelve pixels and three of them
+      // plus the 44px hub button overflowed the 411dp bar by 33. Sharing the
+      // row makes the bar correct at any width and any OS font scale, rather
+      // than correct at the one size it was measured at.
       child: Row(
         children: [
-          _Counter(
-            label: 'TOTAL XP',
-            value: player?.totalXp ?? 0,
-            color: AppColors.accentPurple,
+          Expanded(
+            child: _Counter(
+              label: 'TOTAL XP',
+              value: player?.totalXp ?? 0,
+              color: AppColors.accentPurple,
+            ),
           ),
-          const SizedBox(width: 22),
-          _Counter(
-            label: 'STREAK',
-            value: player?.currentStreak ?? 0,
-            color: (player?.currentStreak ?? 0) > 0
-                ? AppColors.accentGold
-                : AppColors.textDim,
+          Expanded(
+            child: _Counter(
+              label: 'STREAK',
+              value: player?.currentStreak ?? 0,
+              color: (player?.currentStreak ?? 0) > 0
+                  ? AppColors.accentGold
+                  : AppColors.textDim,
+            ),
           ),
-          const SizedBox(width: 22),
-          _Counter(
-            label: 'PERFECT',
-            value: player?.perfectDays ?? 0,
-            color: AppColors.remaining,
+          Expanded(
+            child: _Counter(
+              label: 'PERFECT',
+              value: player?.perfectDays ?? 0,
+              color: AppColors.remaining,
+            ),
           ),
-          const Spacer(),
           _HubButton(onTap: onOpenHub),
         ],
       ),
@@ -366,7 +415,12 @@ class _Counter extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: AppTextStyles.hudLabel.copyWith(fontSize: 9)),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
+        ),
         AnimatedCounter(
           value: value,
           style: AppTextStyles.counter.copyWith(color: color, fontSize: 15),

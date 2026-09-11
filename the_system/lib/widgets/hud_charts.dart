@@ -91,7 +91,7 @@ class HudLineChart extends StatelessWidget {
                 getTitlesWidget: (value, meta) => Text(
                   value.toStringAsFixed(0),
                   style: AppTextStyles.hudLabel.copyWith(
-                    fontSize: 9,
+                    fontSize: 11,
                     color: AppColors.textDim,
                   ),
                 ),
@@ -117,7 +117,7 @@ class HudLineChart extends StatelessWidget {
                     child: Text(
                       xLabels[i],
                       style: AppTextStyles.hudLabel.copyWith(
-                        fontSize: 9,
+                        fontSize: 11,
                         color: AppColors.textDim,
                       ),
                     ),
@@ -138,7 +138,7 @@ class HudLineChart extends StatelessWidget {
                     '${visible[t.barIndex].label}  '
                     '${_trim(t.y)}${visible[t.barIndex].unit}',
                     AppTextStyles.hudLabel.copyWith(
-                      fontSize: 11,
+                      fontSize: 12,
                       color: visible[t.barIndex].color,
                     ),
                   ),
@@ -241,7 +241,7 @@ class HudBarChart extends StatelessWidget {
                 getTitlesWidget: (value, meta) => Text(
                   value.toStringAsFixed(0),
                   style: AppTextStyles.hudLabel.copyWith(
-                    fontSize: 9,
+                    fontSize: 11,
                     color: AppColors.textDim,
                   ),
                 ),
@@ -267,7 +267,7 @@ class HudBarChart extends StatelessWidget {
                     child: Text(
                       bars[i].label,
                       style: AppTextStyles.hudLabel.copyWith(
-                        fontSize: 9,
+                        fontSize: 11,
                         color: AppColors.textDim,
                       ),
                     ),
@@ -286,7 +286,7 @@ class HudBarChart extends StatelessWidget {
                 '${bars[group.x].label}\n'
                 '${rod.toY.toStringAsFixed(0)}$unit',
                 AppTextStyles.hudLabel.copyWith(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppColors.textPrimary,
                 ),
               ),
@@ -387,7 +387,7 @@ class HudDonut extends StatelessWidget {
                       Expanded(
                         child: Text(
                           s.label,
-                          style: AppTextStyles.hudLabel.copyWith(fontSize: 10),
+                          style: AppTextStyles.hudLabel.copyWith(fontSize: 12),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -395,7 +395,7 @@ class HudDonut extends StatelessWidget {
                       Text(
                         '${(s.value / total * 100).round()}%',
                         style: AppTextStyles.readout.copyWith(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: s.color,
                         ),
                       ),

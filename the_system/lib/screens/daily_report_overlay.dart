@@ -146,7 +146,7 @@ class DailyReportOverlay extends StatelessWidget {
                           ),
                           Text(
                             task.scheduledLabel,
-                            style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+                            style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
                           ),
                         ],
                       ),
@@ -156,7 +156,7 @@ class DailyReportOverlay extends StatelessWidget {
                   Text(
                     'Missing a step costs no XP — it costs the day its bar, '
                     'and the streak.',
-                    style: AppTextStyles.body.copyWith(fontSize: 11),
+                    style: AppTextStyles.body.copyWith(fontSize: 12),
                   ),
                 ],
               ),

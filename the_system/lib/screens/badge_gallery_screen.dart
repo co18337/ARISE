@@ -121,7 +121,7 @@ class _Group extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(subtitle, style: AppTextStyles.body.copyWith(fontSize: 12)),
+          Text(subtitle, style: AppTextStyles.body.copyWith(fontSize: 13)),
           const SizedBox(height: 14),
           Wrap(
             spacing: 12,
@@ -173,7 +173,7 @@ class _Cell extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTextStyles.hudLabel.copyWith(
-              fontSize: 8,
+              fontSize: 11,
               color: assigned ? AppColors.accentGold : AppColors.textDim,
             ),
           ),

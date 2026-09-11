@@ -233,7 +233,7 @@ class _Credits extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Licensed CC BY 3.0 · creativecommons.org/licenses/by/3.0',
-            style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+            style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
           ),
         ],
       ),
@@ -296,7 +296,7 @@ class _Preview extends StatelessWidget {
             lines,
             style: TextStyle(
               fontFamily: AppFonts.mono,
-              fontSize: 11,
+              fontSize: 12,
               height: 1.5,
               color: AppColors.textSecondary,
             ),
@@ -329,7 +329,7 @@ class _RestorePanel extends StatelessWidget {
             'Paste the contents of a backup file. This REPLACES everything '
             'currently in the app — quests, training, scans, memory. It does '
             'not merge.',
-            style: AppTextStyles.body.copyWith(fontSize: 12),
+            style: AppTextStyles.body.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 12),
           GradientButton(
@@ -387,13 +387,13 @@ class _PasteBackupDialogState extends State<_PasteBackupDialog> {
               maxLines: 6,
               style: TextStyle(
                 fontFamily: AppFonts.mono,
-                fontSize: 11,
+                fontSize: 12,
                 color: AppColors.textSecondary,
               ),
               decoration: InputDecoration(
                 hintText: '{"app":"The System", ...',
                 hintStyle: AppTextStyles.body.copyWith(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppColors.textDim,
                 ),
               ),
@@ -444,7 +444,7 @@ class _ConfirmRestoreDialog extends StatelessWidget {
         children: [
           if (plan.exportedAt != null)
             Text('Taken ${plan.exportedAt}',
-                style: AppTextStyles.hudLabel.copyWith(fontSize: 10)),
+                style: AppTextStyles.hudLabel.copyWith(fontSize: 12)),
           const SizedBox(height: 10),
           for (final line in [
             '${plan.quests} quests',
@@ -454,12 +454,12 @@ class _ConfirmRestoreDialog extends StatelessWidget {
             '${plan.labs} lab results',
             '${plan.documents} memory documents',
           ])
-            Text('· $line', style: AppTextStyles.body.copyWith(fontSize: 12)),
+            Text('· $line', style: AppTextStyles.body.copyWith(fontSize: 13)),
           const SizedBox(height: 12),
           Text(
             'Everything now in the app is deleted first.',
             style: AppTextStyles.body
-                .copyWith(fontSize: 12, color: AppColors.danger),
+                .copyWith(fontSize: 13, color: AppColors.danger),
           ),
         ],
       ),

@@ -155,7 +155,7 @@ class _Placeholder extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             exercise.kind.label,
-            style: AppTextStyles.hudLabel.copyWith(fontSize: 8),
+            style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
           ),
         ],
       ),

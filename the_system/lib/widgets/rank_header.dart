@@ -56,19 +56,26 @@ class RankHeader extends StatelessWidget {
                   children: [
                     Text(
                       'HUNTER',
-                      style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+                      style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       '·',
-                      style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+                      style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      '${rank.label} RANK',
-                      style: AppTextStyles.hudLabel.copyWith(
-                        fontSize: 9,
-                        color: rank.color,
+                    // Flexible so the rank label gives way rather than
+                    // overflowing: at the raised type floor this line ran 4px
+                    // past the header on a 411dp screen.
+                    Flexible(
+                      child: Text(
+                        '${rank.label} RANK',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.hudLabel.copyWith(
+                          fontSize: 11,
+                          color: rank.color,
+                        ),
                       ),
                     ),
                   ],
@@ -85,7 +92,7 @@ class RankHeader extends StatelessWidget {
                     Text(
                       'LEVEL $level',
                       style: AppTextStyles.hudLabel.copyWith(
-                        fontSize: 10,
+                        fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -112,7 +119,7 @@ class RankHeader extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.counter.copyWith(
-                          fontSize: 11,
+                          fontSize: 12,
                           letterSpacing: 0.5,
                           color: AppColors.textSecondary,
                         ),

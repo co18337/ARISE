@@ -46,7 +46,7 @@ class StatChip extends StatelessWidget {
             stat.label,
             style: AppTextStyles.hudLabel.copyWith(
               color: color,
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: 1.0,
             ),
           ),

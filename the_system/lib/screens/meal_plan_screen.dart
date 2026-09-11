@@ -119,7 +119,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                         '8:30pm. Anything you do eat then still gets logged '
                         'on NUTRITION.',
                         style: AppTextStyles.body.copyWith(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -162,7 +162,7 @@ class _PlanMealCard extends StatelessWidget {
                 child: Text(
                   meal.slot.label,
                   style: AppTextStyles.hudLabel.copyWith(
-                    fontSize: 10,
+                    fontSize: 12,
                     color: AppColors.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -172,7 +172,7 @@ class _PlanMealCard extends StatelessWidget {
               Text(
                 '${meal.kcal} kcal',
                 style: AppTextStyles.hudLabel.copyWith(
-                  fontSize: 10,
+                  fontSize: 12,
                   color: AppColors.textDim,
                 ),
               ),
@@ -184,7 +184,7 @@ class _PlanMealCard extends StatelessWidget {
           Text(
             meal.detail,
             style: AppTextStyles.body.copyWith(
-              fontSize: 12,
+              fontSize: 13,
               color: AppColors.textSecondary,
               height: 1.4,
             ),
@@ -223,7 +223,7 @@ class _MacroPill extends StatelessWidget {
     ),
     child: Text(
       '$label ${grams % 1 == 0 ? grams.toInt() : grams.toStringAsFixed(1)} g',
-      style: AppTextStyles.hudLabel.copyWith(fontSize: 10, color: color),
+      style: AppTextStyles.hudLabel.copyWith(fontSize: 12, color: color),
     ),
   );
 }
@@ -290,7 +290,7 @@ class _PlanVerdict extends StatelessWidget {
                       'Measured BMR is ${NutritionTargets.measuredBmr} kcal; '
                       'eating below it is not a goal.',
             style: AppTextStyles.body.copyWith(
-              fontSize: 12,
+              fontSize: 13,
               color: AppColors.textSecondary,
               height: 1.4,
             ),

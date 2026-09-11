@@ -111,7 +111,7 @@ class _PlanScreenState extends State<PlanScreen> {
                         ? 'Hide $archived archived'
                         : 'Show $archived archived',
                     style: AppTextStyles.hudLabel.copyWith(
-                      fontSize: 10,
+                      fontSize: 12,
                       color: AppColors.primary,
                     ),
                   ),
@@ -187,7 +187,7 @@ class _StepCard extends StatelessWidget {
                 Text(
                   '${t.xp} XP',
                   style: AppTextStyles.hudLabel.copyWith(
-                    fontSize: 10,
+                    fontSize: 12,
                     color: AppColors.accentGold,
                   ),
                 ),
@@ -265,7 +265,7 @@ class _Tag extends StatelessWidget {
     ),
     child: Text(
       text.toUpperCase(),
-      style: AppTextStyles.hudLabel.copyWith(fontSize: 9, color: colour),
+      style: AppTextStyles.hudLabel.copyWith(fontSize: 11, color: colour),
     ),
   );
 }
@@ -291,7 +291,7 @@ class _Action extends StatelessWidget {
           Text(
             label,
             style: AppTextStyles.hudLabel.copyWith(
-              fontSize: 10,
+              fontSize: 12,
               color: AppColors.textSecondary,
             ),
           ),
@@ -491,7 +491,7 @@ class _EditSheetState extends State<_EditSheet> {
                 Text(
                   _error!,
                   style: AppTextStyles.body.copyWith(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: AppColors.danger,
                   ),
                 ),
@@ -521,7 +521,7 @@ class _Label extends StatelessWidget {
     child: Text(
       text,
       style: AppTextStyles.hudLabel.copyWith(
-        fontSize: 9,
+        fontSize: 11,
         color: AppColors.textDim,
       ),
     ),

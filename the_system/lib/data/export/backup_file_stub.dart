@@ -8,3 +8,13 @@ Future<String?> saveBackupFile(String fileName, String contents) async => null;
 /// No share sheet in a browser either. Reported as "not shared" rather than
 /// thrown, so the screen degrades to the clipboard instead of showing an error.
 Future<bool> shareBackupFile(String fileName, String contents) async => false;
+
+/// No file system in a browser, so there is nothing to snapshot.
+Future<String?> saveRollingSnapshot(
+  String fileName,
+  String contents, {
+  int keep = 7,
+}) async => null;
+
+/// Never any snapshots on web.
+Future<DateTime?> newestSnapshotAt() async => null;

@@ -44,10 +44,22 @@ class TodayScreen extends StatefulWidget {
   /// award no XP.
   final Future<void> Function()? onDayOpened;
 
+  /// Pulls in whatever the phone recorded, BEFORE the routine judges the day.
+  ///
+  /// The ordering is the entire point. openToday closes every step whose
+  /// window has already shut, and a step closed as MISSED can never be
+  /// reopened by a sync — HealthRepository only ever completes a quest that is
+  /// still PENDING, deliberately, so that a sensor can never fail your day.
+  /// A run recorded at seven that reaches the database at 9:01 is therefore
+  /// worthless if the nine o'clock window was closed at 9:00. Awaited, and
+  /// first.
+  final Future<void> Function()? onBeforeDayOpens;
+
   const TodayScreen({
     super.key,
     required this.questRepository,
     this.onDayOpened,
+    this.onBeforeDayOpens,
     this.onOpenReport,
     this.onOpenTraining,
   });
@@ -109,9 +121,11 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
     // materialised yet and schedules nothing at all. Measured on the G34:
     // "[alerts] scheduled 0" at 18:54 with four steps still to come.
     // It still cannot throw — reschedule() swallows its own failures.
-    _ready = widget.questRepository.openToday().then((_) async {
-      await widget.onDayOpened?.call();
-    });
+    _ready = openDaySequence(
+      beforeOpen: widget.onBeforeDayOpens,
+      open: widget.questRepository.openToday,
+      afterOpen: widget.onDayOpened,
+    );
     _questStream = widget.questRepository.watchDay(_today);
   }
 
@@ -473,7 +487,7 @@ class _DayPanel extends StatelessWidget {
                   '$missed missed',
                   style: AppTextStyles.hudLabel.copyWith(
                     color: AppColors.danger,
-                    fontSize: 10,
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -571,4 +585,29 @@ String _formatDate(DateTime date) {
   final weekday = _weekdayNames[date.weekday - 1];
   final month = _monthNames[date.month - 1];
   return '$weekday  ·  $month ${date.day}';
+}
+
+/// The day's opening sequence, in the order it has to happen.
+///
+/// Sensors first, then the day is opened and lapsed steps closed, then the
+/// alerts are re-armed from whatever survived. Each step reads what the one
+/// before it wrote, so none of them may run alongside another.
+///
+/// The ordering is load-bearing and it shipped wrong. openToday closes every
+/// step whose window has already shut, and HealthRepository only ever completes
+/// a quest still PENDING — deliberately, so a sensor can never fail your day.
+/// Together those mean a run recorded at seven that reaches the database one
+/// minute after the window closed is worth nothing. The sync was fired
+/// unawaited alongside the day and the local database won the race every time.
+///
+/// Lifted out of the widget so the order is a unit test rather than something
+/// proved by pumping a screen with a database behind it.
+Future<void> openDaySequence({
+  Future<void> Function()? beforeOpen,
+  required Future<void> Function() open,
+  Future<void> Function()? afterOpen,
+}) async {
+  await beforeOpen?.call();
+  await open();
+  await afterOpen?.call();
 }

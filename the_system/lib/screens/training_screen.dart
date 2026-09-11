@@ -348,7 +348,7 @@ class _SessionHeader extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${session.phase.label} · ${session.phase.focus}',
-            style: AppTextStyles.body.copyWith(fontSize: 12),
+            style: AppTextStyles.body.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 14),
           StatBar(
@@ -369,7 +369,7 @@ class _SessionHeader extends StatelessWidget {
                         ? '1 set beyond the plan'
                         : '${session.extraSetsDone} sets beyond the plan',
                     style: AppTextStyles.body.copyWith(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: AppColors.accentGold,
                     ),
                   ),
@@ -377,7 +377,7 @@ class _SessionHeader extends StatelessWidget {
                 Text(
                   '+${session.extraSetsDone * GameRules.xpPerExtraSet} XP',
                   style: AppTextStyles.counter.copyWith(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: AppColors.accentGold,
                   ),
                 ),
@@ -388,7 +388,7 @@ class _SessionHeader extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'SUMMONED ${_clockTime(session.summonedAt!)}',
-              style: AppTextStyles.hudLabel.copyWith(fontSize: 8),
+              style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
             ),
           ],
         ],
@@ -431,7 +431,7 @@ class _SignedOff extends StatelessWidget {
             'Logged, locked and written to memory. The workout quest is '
             'cleared — check DAILY QUESTS for the XP.',
             textAlign: TextAlign.center,
-            style: AppTextStyles.body.copyWith(fontSize: 12),
+            style: AppTextStyles.body.copyWith(fontSize: 13),
           ),
         ],
       ),
@@ -481,7 +481,7 @@ class _StandingNote extends StatelessWidget {
             child: Text(
               text,
               style: AppTextStyles.body.copyWith(
-                fontSize: 12,
+                fontSize: 13,
                 height: 1.4,
                 color: AppColors.textSecondary,
               ),
@@ -524,7 +524,7 @@ class _TrainerNotes extends StatelessWidget {
                 Expanded(
                   child: Text(
                     note,
-                    style: AppTextStyles.body.copyWith(fontSize: 12),
+                    style: AppTextStyles.body.copyWith(fontSize: 13),
                   ),
                 ),
               ],
@@ -537,7 +537,7 @@ class _TrainerNotes extends StatelessWidget {
             // of your own record are not the same kind of claim.
             Text(
               source.caption.toUpperCase(),
-              style: AppTextStyles.hudLabel.copyWith(fontSize: 8),
+              style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
             ),
           ],
         ],
@@ -614,7 +614,7 @@ class _ExerciseCard extends StatelessWidget {
             Text(
               '${exercise.name} — ${set.target} ${exercise.unit.label} asked '
               'for.',
-              style: AppTextStyles.body.copyWith(fontSize: 12),
+              style: AppTextStyles.body.copyWith(fontSize: 13),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -652,7 +652,7 @@ class _ExerciseCard extends StatelessWidget {
                         'for is fine and earns XP.'
                   : 'More than asked for is fine — it is recorded and it earns '
                         'XP. It will not make next week harder on its own.',
-              style: AppTextStyles.body.copyWith(fontSize: 11),
+              style: AppTextStyles.body.copyWith(fontSize: 12),
             ),
           ],
         ),
@@ -755,7 +755,7 @@ class _ExerciseCard extends StatelessWidget {
                 const Spacer(),
                 Text(
                   exercise.kind.label,
-                  style: AppTextStyles.hudLabel.copyWith(fontSize: 9),
+                  style: AppTextStyles.hudLabel.copyWith(fontSize: 11),
                 ),
               ],
             ),
@@ -831,7 +831,7 @@ class _ExerciseHeading extends StatelessWidget {
         const SizedBox(height: 6),
         // The cue does the job the animation would, and does it whether or not
         // there is artwork for this movement.
-        Text(exercise.cue, style: AppTextStyles.body.copyWith(fontSize: 12)),
+        Text(exercise.cue, style: AppTextStyles.body.copyWith(fontSize: 13)),
       ],
     );
   }
@@ -907,7 +907,7 @@ class _SetChip extends StatelessWidget {
                 Text(
                   '$amount ${unit.label}',
                   style: AppTextStyles.counter.copyWith(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: color,
                   ),
                 ),
@@ -916,7 +916,7 @@ class _SetChip extends StatelessWidget {
                   Text(
                     '+${set.actual! - set.target}',
                     style: AppTextStyles.hudLabel.copyWith(
-                      fontSize: 9,
+                      fontSize: 11,
                       color: AppColors.accentGold,
                     ),
                   ),
@@ -972,7 +972,7 @@ class _AddSetChip extends StatelessWidget {
               Text(
                 'ONE MORE',
                 style: AppTextStyles.hudLabel.copyWith(
-                  fontSize: 9,
+                  fontSize: 11,
                   color: AppColors.accentGold,
                 ),
               ),

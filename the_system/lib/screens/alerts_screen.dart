@@ -122,7 +122,7 @@ class _AlertsScreenState extends State<AlertsScreen>
                 Text(
                   _message!,
                   style: AppTextStyles.body.copyWith(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -195,7 +195,7 @@ class _Controls extends StatelessWidget {
               'This build cannot post notifications — you are running in a '
               'browser. Install the APK on the phone to test them.',
               style: AppTextStyles.body.copyWith(
-                fontSize: 12,
+                fontSize: 13,
                 color: AppColors.textSecondary,
               ),
             )
@@ -230,7 +230,7 @@ class _Controls extends StatelessWidget {
               'permissions. No API reports that reliably — it has to be '
               'switched off for The System in Android settings.',
               style: AppTextStyles.body.copyWith(
-                fontSize: 11,
+                fontSize: 12,
                 height: 1.4,
                 color: AppColors.textDim,
               ),
@@ -272,7 +272,7 @@ class _Planned extends StatelessWidget {
             'Derived from today\'s routine, so they cannot disagree with it. '
             'Answer a step and its alert disappears.',
             style: AppTextStyles.body.copyWith(
-              fontSize: 11,
+              fontSize: 12,
               height: 1.4,
               color: AppColors.textDim,
             ),
@@ -321,7 +321,7 @@ class _AlertRow extends StatelessWidget {
                 Text(
                   alert.kind.label,
                   style: AppTextStyles.hudLabel.copyWith(
-                    fontSize: 9,
+                    fontSize: 11,
                     color: accent,
                   ),
                 ),
@@ -329,7 +329,7 @@ class _AlertRow extends StatelessWidget {
                 Text(
                   alert.body,
                   style: AppTextStyles.body.copyWith(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),

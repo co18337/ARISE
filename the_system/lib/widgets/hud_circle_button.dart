@@ -105,7 +105,7 @@ class HudCircleButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.hudLabel.copyWith(
                   color: color,
-                  fontSize: 10,
+                  fontSize: 12,
                   letterSpacing: 1.4,
                 ),
               ),

@@ -55,7 +55,7 @@ class AppTextStyles {
   /// Small dim labels above a value, e.g. "HUNTER", "DAILY XP".
   static TextStyle get hudLabel => TextStyle(
     fontFamily: AppFonts.hud,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: FontWeight.w600,
     color: AppColors.textDim,
     letterSpacing: 2.0,
@@ -117,7 +117,7 @@ class AppTextStyles {
   /// General body copy.
   static TextStyle get body => TextStyle(
     fontFamily: AppFonts.body,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
     height: 1.4,

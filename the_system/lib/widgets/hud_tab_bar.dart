@@ -56,7 +56,7 @@ class _Tab extends StatelessWidget {
             textAlign: TextAlign.center,
             style: AppTextStyles.hudLabel.copyWith(
               color: selected ? accent : AppColors.textDim,
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ),

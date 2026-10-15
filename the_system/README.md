@@ -1,4 +1,4 @@
-# the_system
+# ARISE
 
 A new Flutter project.
 
